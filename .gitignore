@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local environment secrets
+.env
+.env.local
+.env.*.local
+
+# Dependency folders
+node_modules/
+/.next/
+/out/
+
+# Docker database volumes (Crucial!)
+postgres_data/
