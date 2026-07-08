@@ -55,7 +55,7 @@ export const incidents = pgTable("incidents", {
     title: text('title').notNull(),
     description: text('description').notNull(),
     type: typeEnum("type").notNull(),
-    priority: priorityEnum("priority").notNull(),
+    priority: priorityEnum("priority").notNull().default('Medium'),
     status: statusEnum("status").notNull().default('New'),
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
