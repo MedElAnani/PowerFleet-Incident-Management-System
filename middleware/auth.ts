@@ -35,7 +35,7 @@ export function withAuth(handler: NextRouteHandler, requiredRole?: string) {
             }
             
             // 3. Role-Based Access Control Check
-            if(requiredRole && decoded.role !== requiredRole) {
+            if(requiredRole && decoded.userROLE !== requiredRole) {
                 return NextResponse.json(
                     { error: `Forbidden: Only ${requiredRole}s can access this resource` },
                     { status: 403 }
@@ -45,8 +45,8 @@ export function withAuth(handler: NextRouteHandler, requiredRole?: string) {
             // 4. Attach decoded user payload to the request object for easy access
             const authenticatedRequest = request as AuthenticatedRequest;
             authenticatedRequest.user = {
-                userId: decoded.userId,
-                role: decoded.role
+                userId: decoded.userID,
+                role: decoded.userROLE
             }
             
             return handler(authenticatedRequest, ...args)
