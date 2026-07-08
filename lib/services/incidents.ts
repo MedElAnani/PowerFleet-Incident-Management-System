@@ -64,8 +64,7 @@ export async function createIncident(data: CreateIncidentInput, authenticatedUse
         vehicleId,
         latitude,
         longitude,
-        clientId: clientRecord.id,
-        reportedById: authenticatedUserId,
+        reportedById: clientRecord.id,
     }).returning();
 
     return newIncident;

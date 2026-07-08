@@ -21,11 +21,11 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
             )
         }
         
-        if (currentUser.role === "client") {
+        if (currentUser.role === "ClientUser") {
             const clientRecord = await db.query.clients.findFirst({
                 where: eq(clients.userId, currentUser.userId),
             });
-            if (!clientRecord || incident.clientId !== clientRecord.id) {
+            if (!clientRecord || incident.reportedById !== clientRecord.id) {
                 return NextResponse.json({ error: "Forbidden You can't access to this incident !" }, { status: 403 });
             }
         }

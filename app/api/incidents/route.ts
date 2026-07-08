@@ -39,4 +39,4 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
             { status: 500 }
         );
     }
-}, "client");
+}, "ClientUser");
