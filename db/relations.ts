@@ -11,7 +11,7 @@ import {
 } from "./schema";
 
 // 1. User Table Relations
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
     clientProfile: one(clients, {
         fields: [users.id],
         references: [clients.userId],
@@ -20,6 +20,7 @@ export const usersRelations = relations(users, ({ one }) => ({
         fields: [users.id],
         references: [internal_users.userId],
     }),
+    reportedIncidents: many(incidents),
 }));
 
 // 2. Internal Users Table Relations
@@ -85,13 +86,17 @@ export const vehiclesRelations = relations(vehicles, ({ one, many }) => ({
 
 // 5. Incidents Table Relations (Updated to match your exact columns)
 export const incidentsRelations = relations(incidents, ({ one }) => ({
+    client: one(clients, {
+        fields: [incidents.clientId],
+        references: [clients.id],
+    }),
     vehicle: one(vehicles, {
         fields: [incidents.vehicleId],
         references: [vehicles.id],
     }),
-    reportedBy: one(clients, { // ◄── Updated: Maps to clients instead of users
+    reportedBy: one(users, {
         fields: [incidents.reportedById],
-        references: [clients.id],
+        references: [users.id],
     }),
     assignedTo: one(technicians, {
         fields: [incidents.assignedToId],

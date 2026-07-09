@@ -104,12 +104,15 @@ export const incidents = pgTable("incidents", {
     resolvedAt: timestamp("resolved_at"),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
+    clientId: integer('client_id')
+        .references(() => clients.id, { onDelete: "restrict" })
+        .notNull(),
     vehicleId: integer('vehicle_id')
-        .references(() => vehicles.id, { onDelete: "cascade" })
+        .references(() => vehicles.id, { onDelete: "restrict" })
         .notNull(),
     reportedById: integer('reported_by_id')
-        .references(() => clients.id, { onDelete: "cascade" })
+        .references(() => users.id, { onDelete: "restrict" })
         .notNull(),
     assignedToId: integer('assigned_to_id')
-        .references(() => technicians.id, { onDelete: "cascade" }),
+        .references(() => technicians.id, { onDelete: "set null" }),
 })
