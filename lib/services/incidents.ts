@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { incidents, clients, vehicles, internal_users, technicians } from "@/db/schema";
+import { incidents, clients, vehicles, internal_users, technicians, support_managers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
 type IncidentType = 
@@ -207,14 +207,17 @@ export async function updateIncident(
 
     // ---- InternalUser: resolve real sub-role ----
     const internalUserRecord = await db.query.internal_users.findFirst({
-        where: and(
-            eq(internal_users.userId, authenticatedUserId),
-            eq(internal_users.isActive, true)
-        )
+        where: eq(internal_users.userId, authenticatedUserId)
     });
 
     if (!internalUserRecord) {
         const error = new Error("Forbidden: You cannot access this incident!");
+        (error as any).status = 403;
+        throw error;
+    }
+
+    if (!internalUserRecord.isActive) {
+        const error = new Error("Forbidden: Your account is inactive and cannot make changes.");
         (error as any).status = 403;
         throw error;
     }
@@ -242,6 +245,17 @@ export async function updateIncident(
             const error = new Error("Forbidden: Support Managers cannot close or cancel an incident.");
             (error as any).status = 403;
             throw error;
+        }
+        
+        if (assignedToId !== undefined) {
+            const smRecord = await db.query.support_managers.findFirst({
+                where: eq(support_managers.internalUserId, internalUserRecord.id)
+            });
+            if (!smRecord || !smRecord.canAssign) {
+                const error = new Error("Forbidden: You do not have permission to assign incidents.");
+                (error as any).status = 403;
+                throw error;
+            }
         }
 
         const [updatedIncident] = await db
