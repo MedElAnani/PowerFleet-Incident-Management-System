@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth"; 
 import { db } from "@/db"
-import { incidents, clients } from "@/db/schema";
+import { incidents, clients, internal_users, technicians } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { updateIncident } from "@/lib/services/incidents";
 
 export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { params: { id: string } }) => {
     try {
@@ -36,6 +37,23 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
             }
         }
         
+        const internalUserRecord = await db.query.internal_users.findFirst({
+            where: eq(internal_users.userId, currentUser.userId)
+        })
+        
+        if(internalUserRecord?.internalRole === "Technician"){
+            const techRecord = await db.query.technicians.findFirst({
+                where: eq(technicians.internalUserId, internalUserRecord.id)
+            })
+            
+            if(techRecord?.id !== incident.assignedToId){
+                return NextResponse.json(
+                    { error: "Forbidden: You cannot access this incident!" }, 
+                    { status: 403 }
+                );
+            }
+        }
+        
         // Returns the clear incident layout safely
         return NextResponse.json(incident);
 
@@ -46,3 +64,37 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         );
     }
 });
+
+export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { params: { id: string } }) => {
+    try{
+        const { id } = await params;
+        const incidentId = Number(id);
+        const currentUser = req.user!;
+        
+        let body;
+        try {
+            body = await req.json();
+        } catch {
+            return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+        }
+        
+        const newUpdatedIncident = await updateIncident(body, currentUser.userId, currentUser.role, incidentId);
+        
+        return NextResponse.json(
+            newUpdatedIncident,
+            { status: 201 }
+        )
+        
+    }catch(error: any){
+        console.error("Incident update route caught an error:", error);
+
+        if (error.status) {
+            return NextResponse.json({ error: error.message }, { status: error.status });
+        }
+
+        return NextResponse.json(
+            { error: "Internal Server Error", details: error.message },
+            { status: 500 }
+        );
+    }
+} )
