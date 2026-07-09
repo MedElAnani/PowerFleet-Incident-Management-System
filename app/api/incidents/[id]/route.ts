@@ -1,4 +1,3 @@
-// app/api/incidents/[id]/route.ts
 import { NextResponse } from "next/server"
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth"; 
 import { db } from "@/db"
