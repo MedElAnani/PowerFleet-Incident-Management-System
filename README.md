@@ -137,11 +137,16 @@ PostgreSQL Database
 
 ### Incidents
 
-| Method | Endpoint               | Description              | Role Required     |
-| ------ | ---------------------- | ------------------------ | ----------------- |
-| GET    | `/api/incidents`       | List incidents (scoped)  | Any authenticated |
-| POST   | `/api/incidents`       | Create an incident       | ClientUser        |
-| GET    | `/api/incidents/:id`   | Get incident by ID       | Any authenticated |
+| Method | Endpoint                      | Description                               | Role Required     |
+| ------ | ----------------------------- | ----------------------------------------- | ----------------- |
+| GET    | `/api/incidents`              | List incidents (scoped)                   | Any authenticated |
+| POST   | `/api/incidents`              | Create an incident                        | ClientUser        |
+| GET    | `/api/incidents/:id`          | Get incident by ID                        | Any authenticated |
+| PATCH  | `/api/incidents/:id`          | Update an incident                        | Any authenticated |
+| POST   | `/api/incidents/:id/comments` | Add a comment to an incident              | Any authenticated |
+| GET    | `/api/incidents/:id/events`   | Get incident timeline (events)            | Any authenticated |
+| GET    | `/api/incidents/similar`      | Get similar incidents                     | Any authenticated |
+| GET    | `/api/incidents/:id/impact`   | Get impact map data for an incident       | Any authenticated |
 
 ### Vehicles
 
