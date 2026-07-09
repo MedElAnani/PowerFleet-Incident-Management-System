@@ -11,6 +11,13 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         const incidentId = Number(id);
         const currentUser = req.user!;
         
+        if (isNaN(incidentId)) {
+            return NextResponse.json(
+                { error: "Invalid incident ID" },
+                { status: 400 }
+            );
+        }
+        
         // Find the incident by ID
         const incident = await db.query.incidents.findFirst({
             where: eq(incidents.id, incidentId)
@@ -29,7 +36,7 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
                 where: eq(clients.userId, currentUser.userId),
             });
             
-            if (!clientRecord || incident.reportedById !== clientRecord.id) {
+            if (!clientRecord || incident.clientId !== clientRecord.id) {
                 return NextResponse.json(
                     { error: "Forbidden: You cannot access this incident!" }, 
                     { status: 403 }
@@ -71,6 +78,13 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { pa
         const incidentId = Number(id);
         const currentUser = req.user!;
         
+        if (isNaN(incidentId)) {
+            return NextResponse.json(
+                { error: "Invalid incident ID" },
+                { status: 400 }
+            );
+        }
+        
         let body;
         try {
             body = await req.json();
@@ -82,7 +96,7 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { pa
         
         return NextResponse.json(
             newUpdatedIncident,
-            { status: 201 }
+            { status: 200 }
         )
         
     }catch(error: any){

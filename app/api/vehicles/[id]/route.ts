@@ -10,6 +10,13 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         const vehicleId = Number(id);
         const currentUser = req.user!;
         
+        if (isNaN(vehicleId)) {
+            return NextResponse.json(
+                { error: "Invalid vehicle ID" },
+                { status: 400 }
+            );
+        }
+        
         // Find the incident by ID
         const vehicle = await db.query.vehicles.findFirst({
             where: eq(vehicles.id, vehicleId),
