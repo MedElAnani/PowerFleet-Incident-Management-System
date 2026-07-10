@@ -137,16 +137,14 @@ PostgreSQL Database
 
 ### Incidents
 
-| Method | Endpoint                      | Description                               | Role Required     |
-| ------ | ----------------------------- | ----------------------------------------- | ----------------- |
-| GET    | `/api/incidents`              | List incidents (scoped)                   | Any authenticated |
-| POST   | `/api/incidents`              | Create an incident                        | ClientUser        |
-| GET    | `/api/incidents/:id`          | Get incident by ID                        | Any authenticated |
-| PATCH  | `/api/incidents/:id`          | Update an incident                        | Any authenticated |
-| POST   | `/api/incidents/:id/comments` | Add a comment to an incident              | Any authenticated |
-| GET    | `/api/incidents/:id/events`   | Get incident timeline (events)            | Any authenticated |
-| GET    | `/api/incidents/similar`      | Get similar incidents                     | Any authenticated |
-| GET    | `/api/incidents/:id/impact`   | Get impact map data for an incident       | Any authenticated |
+| Method | Endpoint                                 | Description                               | Role Required     |
+| ------ | ---------------------------------------- | ----------------------------------------- | ----------------- |
+| GET    | `/api/incidents`                         | List incidents (scoped)                   | Any authenticated |
+| POST   | `/api/incidents`                         | Create an incident                        | ClientUser        |
+| GET    | `/api/incidents/:id`                     | Get incident by ID (includes comments)    | Any authenticated |
+| PATCH  | `/api/incidents/:id`                     | Update an incident                        | Any authenticated |
+| POST   | `/api/incidents/:id/comments`            | Add a comment to an incident              | Any authenticated |
+| PATCH  | `/api/incidents/:id/comments/:commentId` | Update visibility of a comment            | Any authenticated |
 
 ### Vehicles
 
@@ -211,6 +209,13 @@ powerfleet_ims/
 │   ├── api/
 │   │   ├── auth/           # Authentication routes
 │   │   ├── incidents/      # Incident routes
+│   │   │   ├── [id]/
+│   │   │   │   ├── comments/
+│   │   │   │   │   ├── [commentId]/
+│   │   │   │   │   │   └── route.ts  # PATCH update comment visibility
+│   │   │   │   │   └── route.ts      # POST create comments
+│   │   │   │   └── route.ts          # GET/PATCH incident detail/update
+│   │   │   └── route.ts              # GET/POST list/create incidents
 │   │   └── vehicles/       # Vehicle routes
 │   ├── layout.tsx          # Root layout
 │   └── page.tsx            # Home page
@@ -220,6 +225,7 @@ powerfleet_ims/
 │   └── index.ts            # Drizzle client
 ├── lib/
 │   └── services/           # Business logic
+│       ├── comments.ts     # Comment service
 │       ├── incidents.ts    # Incident service
 │       └── vehicles.ts     # Vehicle service
 ├── middleware/

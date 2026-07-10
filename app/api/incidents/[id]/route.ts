@@ -18,9 +18,23 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
             );
         }
         
-        // Find the incident by ID
+        // Find the incident by ID with comments and their authors
         const incident = await db.query.incidents.findFirst({
-            where: eq(incidents.id, incidentId)
+            where: eq(incidents.id, incidentId),
+            with: {
+                comments: {
+                    with: {
+                        user: {
+                            columns: {
+                                id: true,
+                                name: true,
+                                email: true,
+                                role: true,
+                            }
+                        }
+                    }
+                }
+            }
         });
         
         if (!incident) {
@@ -60,9 +74,29 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
                 );
             }
         }
+
+        // Apply visibility rules to filter comments
+        const isTech = internalUserRecord?.internalRole === "Technician";
+        const isStaff = internalUserRecord?.internalRole === "Admin" || internalUserRecord?.internalRole === "Support Manager";
+
+        const filteredComments = incident.comments.filter(comment => {
+            if (comment.visibility === "Public") return true;
+            if (comment.userId === currentUser.userId) return true;
+            if (isStaff) return true;
+            if (isTech) {
+                // Technicians can see all internal/private notes, but not private comments written by Clients
+                return comment.user.role !== "ClientUser";
+            }
+            return false;
+        });
+
+        // Return the incident with filtered comments
+        const incidentWithFilteredComments = {
+            ...incident,
+            comments: filteredComments
+        };
         
-        // Returns the clear incident layout safely
-        return NextResponse.json(incident);
+        return NextResponse.json(incidentWithFilteredComments);
 
     } catch (error: any) {
         return NextResponse.json(

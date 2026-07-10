@@ -7,6 +7,7 @@ export const priorityEnum = pgEnum("incident_priority", ["Low", "Medium", "High"
 export const typeEnum = pgEnum("incident_type", ["GPS Device", "Vehicle", "Driver", "Client Complaint", "Accident", "Fuel", "Mission", "Maintenance", "Payment", "System Bug", "Other"])
 export const adminLevelEnum = pgEnum("admin_access_level", ["Technician", "Support Manager", "Admin"])
 export const internalRoleEnum = pgEnum("internal_user_role", ["Technician", "Support Manager", "Admin"])
+export const visibilityEnum = pgEnum("incident_comments_visibility", ["Public", "Private"])
 
 // 1. User Table
 
@@ -115,4 +116,19 @@ export const incidents = pgTable("incidents", {
         .notNull(),
     assignedToId: integer('assigned_to_id')
         .references(() => technicians.id, { onDelete: "set null" }),
+})
+
+// 9. Incident Comments Table
+
+export const incident_comments = pgTable('incident_comments', {
+    id: serial('id').primaryKey(),
+    body: text('body').notNull(),
+    visibility: visibilityEnum('visibility').notNull().default('Public'),
+    createdAt: timestamp('created_at').defaultNow(),
+    userId: integer('user_id')
+        .references(() => users.id, { onDelete: 'cascade' })
+        .notNull(),
+    incidentId: integer('incident_id')
+        .references(() => incidents.id, { onDelete: 'cascade' })
+        .notNull()
 })

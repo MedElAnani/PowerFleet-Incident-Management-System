@@ -7,20 +7,16 @@ import {
     technicians, 
     clients, 
     vehicles, 
-    incidents 
+    incidents,
+    incident_comments
 } from "./schema";
 
 // 1. User Table Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
-    clientProfile: one(clients, {
-        fields: [users.id],
-        references: [clients.userId],
-    }),
-    internalProfile: one(internal_users, {
-        fields: [users.id],
-        references: [internal_users.userId],
-    }),
+    clientProfile: one(clients),
+    internalProfile: one(internal_users),
     reportedIncidents: many(incidents),
+    comments: many(incident_comments),
 }));
 
 // 2. Internal Users Table Relations
@@ -29,18 +25,9 @@ export const internalUsersRelations = relations(internal_users, ({ one }) => ({
         fields: [internal_users.userId],
         references: [users.id],
     }),
-    adminProfile: one(admins, {
-        fields: [internal_users.id],
-        references: [admins.internalUserId],
-    }),
-    managerProfile: one(support_managers, {
-        fields: [internal_users.id],
-        references: [support_managers.internalUserId],
-    }),
-    technicianProfile: one(technicians, {
-        fields: [internal_users.id],
-        references: [technicians.internalUserId],
-    }),
+    adminProfile: one(admins),
+    managerProfile: one(support_managers),
+    technicianProfile: one(technicians),
 }));
 
 // 3. Role-Specific Profile Relations
@@ -85,7 +72,7 @@ export const vehiclesRelations = relations(vehicles, ({ one, many }) => ({
 }));
 
 // 5. Incidents Table Relations (Updated to match your exact columns)
-export const incidentsRelations = relations(incidents, ({ one }) => ({
+export const incidentsRelations = relations(incidents, ({ one, many }) => ({
     client: one(clients, {
         fields: [incidents.clientId],
         references: [clients.id],
@@ -101,5 +88,18 @@ export const incidentsRelations = relations(incidents, ({ one }) => ({
     assignedTo: one(technicians, {
         fields: [incidents.assignedToId],
         references: [technicians.id],
+    }),
+    comments: many(incident_comments),
+}));
+
+// 6. Incident Comments Table Relations
+export const incidentCommentsRelations = relations(incident_comments, ({ one }) => ({
+    user: one(users, {
+        fields: [incident_comments.userId],
+        references: [users.id],
+    }),
+    incident: one(incidents, {
+        fields: [incident_comments.incidentId],
+        references: [incidents.id],
     }),
 }));
