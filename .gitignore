@@ -10,6 +10,7 @@
 !.yarn/releases
 !.yarn/versions
 
+
 # testing
 /coverage
 
@@ -52,3 +53,5 @@ node_modules/
 
 # Docker database volumes (Crucial!)
 postgres_data/
+
+.scannerwork/
