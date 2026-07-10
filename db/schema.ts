@@ -1,21 +1,70 @@
-import { pgTable, serial, text, timestamp, pgEnum, integer, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, pgEnum, integer, doublePrecision, boolean } from "drizzle-orm/pg-core";
+
+// Enum Columns
+export const roleEnum = pgEnum("user_role", ["ClientUser", "InternalUser"])
+export const statusEnum = pgEnum("incident_status", ["New", "Open", "In Progress", "Waiting Client", "Waiting Technician", "Resolved", "Closed", "Cancelled"])
+export const priorityEnum = pgEnum("incident_priority", ["Low", "Medium", "High", "Critical"])
+export const typeEnum = pgEnum("incident_type", ["GPS Device", "Vehicle", "Driver", "Client Complaint", "Accident", "Fuel", "Mission", "Maintenance", "Payment", "System Bug", "Other"])
+export const adminLevelEnum = pgEnum("admin_access_level", ["Technician", "Support Manager", "Admin"])
+export const internalRoleEnum = pgEnum("internal_user_role", ["Technician", "Support Manager", "Admin"])
+export const visibilityEnum = pgEnum("incident_comments_visibility", ["Public", "Private"])
 
 // 1. User Table
-
-// Role Enum
-export const roleEnum = pgEnum("user_role", ["client", "technician", "supportmanager", "admin"])
 
 export const users = pgTable("users", {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
     email: text("email").notNull().unique(),
     password: text("password").notNull(),
-    role: roleEnum("role").default("client").notNull(),
+    role: roleEnum("role").default("ClientUser").notNull(),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
 })
 
-// 2. Clients Table
+// 2. InternalUser Table
+
+export const internal_users = pgTable("internal_users", {
+    id: serial('id').primaryKey(),
+    internalRole: internalRoleEnum('internal_role').notNull().default('Technician'),
+    department: text('department').notNull(),
+    hireDate: timestamp('hire_date').defaultNow(),
+    isActive: boolean('is_active').notNull().default(true),
+    userId: integer('user_id')
+        .references(() => users.id, { onDelete: "cascade" })
+        .notNull()
+})
+
+// 3. Admin Table
+
+export const admins = pgTable("admins", {
+    id: serial('id').primaryKey(),
+    canManageUsers: boolean('can_manage_users').notNull(),
+    lastActionAt: timestamp('last_action_at'),
+    internalUserId: integer('internal_user_id')
+        .references(() => internal_users.id, { onDelete: "cascade" } )
+        .notNull()
+})
+
+// 4. SupportManager Table
+export const support_managers = pgTable("support_managers", {
+    id: serial('id').primaryKey(),
+    canAssign: boolean('can_assign').notNull().default(true),
+    internalUserId: integer('internal_user_id')
+        .references(() => internal_users.id, { onDelete: "cascade" } )
+        .notNull()
+})
+
+// 5. Technician Table
+export const technicians = pgTable("technicians", {
+    id: serial('id').primaryKey(),
+    specialty: text('specialty').notNull(),
+    isAvailable: boolean('is_available').notNull().default(true),
+    internalUserId: integer('internal_user_id')
+        .references(() => internal_users.id, { onDelete: "cascade" } )
+        .notNull()
+})
+
+// 6. Clients Table
 export const clients = pgTable("clients", {
     id: serial("id").primaryKey(),
     companyName: text("company_name").notNull(),
@@ -27,7 +76,7 @@ export const clients = pgTable("clients", {
 
 
 
-// 3. Vehicles Table
+// 7. Vehicles Table
 export const vehicles = pgTable("vehicles", {
     id: serial('id').primaryKey(),
     name: text('name').notNull(),
@@ -39,23 +88,14 @@ export const vehicles = pgTable("vehicles", {
         .notNull()
 })
 
-// 4. Incidents Table
-
-// Type Enum
-export const typeEnum = pgEnum("incident_type", ["GPS Device", "Vehicle", "Driver", "Client Complaint", "Accident", "Fuel", "Mission", "Maintenance", "Payment", "System Bug", "Other"])
-
-// Type Enum
-export const priorityEnum = pgEnum("incident_priority", ["Low", "Medium", "High", "Critical"])
-
-// Type Enum
-export const statusEnum = pgEnum("incident_status", ["New", "Open", "In Progress", "Waiting Client", "Waiting Technician", "Resolved", "Closed", "Cancelled"])
+// 8. Incidents Table
 
 export const incidents = pgTable("incidents", {
     id: serial('id').primaryKey(),
     title: text('title').notNull(),
     description: text('description').notNull(),
     type: typeEnum("type").notNull(),
-    priority: priorityEnum("priority").notNull(),
+    priority: priorityEnum("priority").notNull().default('Medium'),
     status: statusEnum("status").notNull().default('New'),
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
@@ -66,9 +106,29 @@ export const incidents = pgTable("incidents", {
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
     clientId: integer('client_id')
-        .references(() => clients.id, { onDelete: "cascade" })
+        .references(() => clients.id, { onDelete: "restrict" })
         .notNull(),
     vehicleId: integer('vehicle_id')
-        .references(() => vehicles.id, { onDelete: "cascade" })
+        .references(() => vehicles.id, { onDelete: "restrict" })
+        .notNull(),
+    reportedById: integer('reported_by_id')
+        .references(() => users.id, { onDelete: "restrict" })
+        .notNull(),
+    assignedToId: integer('assigned_to_id')
+        .references(() => technicians.id, { onDelete: "set null" }),
+})
+
+// 9. Incident Comments Table
+
+export const incident_comments = pgTable('incident_comments', {
+    id: serial('id').primaryKey(),
+    body: text('body').notNull(),
+    visibility: visibilityEnum('visibility').notNull().default('Public'),
+    createdAt: timestamp('created_at').defaultNow(),
+    userId: integer('user_id')
+        .references(() => users.id, { onDelete: 'cascade' })
+        .notNull(),
+    incidentId: integer('incident_id')
+        .references(() => incidents.id, { onDelete: 'cascade' })
         .notNull()
 })

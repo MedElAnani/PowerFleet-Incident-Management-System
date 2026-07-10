@@ -1,9 +1,13 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+// db/index.ts
+import { drizzle } from "drizzle-orm/postgres-js"; // Or your matching database driver (e.g., node-postgres or neon)
+import postgres from "postgres"; 
 import * as schema from "./schema";
+import * as relations from "./relations"; // ◄── Import your relations mapping
 
-// 1. Initialize the raw postgres connection client pointing to our environment string
-const queryClient = postgres(process.env.DATABASE_URL!);
+const connectionString = process.env.DATABASE_URL!;
+const queryClient = postgres(connectionString);
 
-// 2. Export the instance of Drizzle, combining the connection pool with your schema definitions
-export const db = drizzle(queryClient, { schema });
+export const db = drizzle(queryClient, { 
+    // Spreading both ensures Drizzle registers how the tables hook together in memory
+    schema: { ...schema, ...relations } 
+});

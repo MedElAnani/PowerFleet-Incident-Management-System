@@ -1,18 +1,18 @@
 import { NextResponse } from 'next/server'
 import { db } from "../../../../db"
-import { users } from '@/db/schema'
+import { clients, users } from '@/db/schema'
 import { eq } from "drizzle-orm"
 import bcrypt from 'bcryptjs'
 
 export async function POST(req: Request) {
     try{
         // 1. Exract the payload
-        const { name, email, password } = await req.json()
+        const { name, companyName, phone, email, password } = await req.json()
         
         // 2. Validate if email and password empty
-        if(!email || !password || !name) {
+        if(!email || !password || !name || !companyName || !phone) {
             return NextResponse.json(
-                { success: false, error: "Email, Password and Name are required." },
+                { success: false, error: "Email, Password, Company Name, Phone and Name are required." },
                 { status: 400 }
             )
         }
@@ -75,14 +75,23 @@ export async function POST(req: Request) {
                 role: users.role,
                 createdAt: users.createdAt
             })
-            
+        
+        await db
+            .insert(clients)
+            .values({
+                companyName,
+                phone,
+                userId: newUser.id
+            });
+        
         // 5. Success Response
         return NextResponse.json(
             { success: true, data: newUser },
             { status: 201 }
         )
-    }catch(err: any){
-        if(err.code === "23505") {
+    } catch (err: unknown) {
+        const pgErr = err as { code?: string };
+        if (pgErr.code === "23505") {
             return NextResponse.json(
                 { success: false, error: "An account associated with this email address already exists." },
                 { status: 400 }
