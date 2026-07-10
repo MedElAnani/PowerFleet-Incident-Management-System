@@ -94,6 +94,7 @@ PostgreSQL Database
 | `technicians`      | Incident resolution                    |
 | `vehicles`         | Fleet vehicles (IMEI, license plate)   |
 | `incidents`        | Incident reports with SLA tracking     |
+| `incident_comments`| Comments on incidents with visibility   |
 
 ### Enums
 
@@ -103,6 +104,7 @@ PostgreSQL Database
 - `incident_priority` — `low`, `medium`, `high`, `critical`
 - `incident_type` — `gps_issue`, `accident`, `fuel_problem`, `maintenance`, `other`
 - `admin_access_level` — `full`, `limited`
+- `incident_comments_visibility` — `Public`, `Private`
 
 ### Key Relationships
 
@@ -112,6 +114,8 @@ PostgreSQL Database
 - `clients` → `incidents` (1:N)
 - `vehicles` → `incidents` (1:N)
 - `technicians` → `incidents` (1:N, assigned)
+- `users` → `incident_comments` (1:N)
+- `incidents` → `incident_comments` (1:N)
 
 ---
 
@@ -119,10 +123,10 @@ PostgreSQL Database
 
 | Role              | Permissions                                                      |
 | ----------------- | ---------------------------------------------------------------- |
-| **ClientUser**    | Register, create incidents, view own incidents only              |
-| **Technician**    | View & resolve assigned incidents                                |
-| **SupportManager**| View all incidents, assign work                                  |
-| **Admin**         | Full access, create & manage vehicles, manage users              |
+| **ClientUser**    | Register, create incidents, view/comment on own incidents, change own comments visibility |
+| **Technician**    | View/comment on assigned incidents, change own comments visibility, resolve incidents |
+| **SupportManager**| View all incidents, assign work, comment on any incident                          |
+| **Admin**         | Full access, manage vehicles & users, comment on any incident, change any comment visibility |
 
 ---
 
