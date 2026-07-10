@@ -98,9 +98,10 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         
         return NextResponse.json(incidentWithFilteredComments);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const err = error as Error;
         return NextResponse.json(
-            { error: error.message },
+            { error: err.message },
             { status: 500 }
         );
     }
@@ -133,15 +134,16 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { pa
             { status: 200 }
         )
         
-    }catch(error: any){
+    } catch (error: unknown) {
         console.error("Incident update route caught an error:", error);
+        const err = error as { status?: number; message?: string };
 
-        if (error.status) {
-            return NextResponse.json({ error: error.message }, { status: error.status });
+        if (err.status) {
+            return NextResponse.json({ error: err.message }, { status: err.status });
         }
 
         return NextResponse.json(
-            { error: "Internal Server Error", details: error.message },
+            { error: "Internal Server Error", details: err.message },
             { status: 500 }
         );
     }

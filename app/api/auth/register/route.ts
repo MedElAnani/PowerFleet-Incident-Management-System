@@ -76,22 +76,22 @@ export async function POST(req: Request) {
                 createdAt: users.createdAt
             })
         
-        const [newClient] = await db
+        await db
             .insert(clients)
             .values({
                 companyName,
                 phone,
                 userId: newUser.id
-                
-            }).returning();
+            });
         
         // 5. Success Response
         return NextResponse.json(
             { success: true, data: newUser },
             { status: 201 }
         )
-    }catch(err: any){
-        if(err.code === "23505") {
+    } catch (err: unknown) {
+        const pgErr = err as { code?: string };
+        if (pgErr.code === "23505") {
             return NextResponse.json(
                 { success: false, error: "An account associated with this email address already exists." },
                 { status: 400 }

@@ -12,10 +12,11 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
         });
 
         return NextResponse.json(data, { status: 200 });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Get incidents route caught an error:", error);
+        const err = error as Error;
         return NextResponse.json(
-            { error: "Internal Server Error", details: error.message },
+            { error: "Internal Server Error", details: err.message },
             { status: 500 }
         );
     }
@@ -29,22 +30,23 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
         const newIncident = await createIncident(body, currentUser.userId);
 
         return NextResponse.json(newIncident, { status: 201 });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Incident creation route caught an error:", error);
+        const err = error as { status?: number; message?: string; constraint?: string };
 
-        if (error.status) {
-            return NextResponse.json({ error: error.message }, { status: error.status });
+        if (err.status) {
+            return NextResponse.json({ error: err.message }, { status: err.status });
         }
 
-        if (error.constraint === 'incidents_vehicle_id_vehicles_id_fk') {
+        if (err.constraint === 'incidents_vehicle_id_vehicles_id_fk') {
             return NextResponse.json({ error: "The provided vehicle ID does not exist." }, { status: 422 });
         }
-        if (error.constraint === 'incidents_client_id_clients_id_fk') {
+        if (err.constraint === 'incidents_client_id_clients_id_fk') {
             return NextResponse.json({ error: "Your client account record is invalid." }, { status: 422 });
         }
 
         return NextResponse.json(
-            { error: "Internal Server Error", details: error.message },
+            { error: "Internal Server Error", details: err.message },
             { status: 500 }
         );
     }

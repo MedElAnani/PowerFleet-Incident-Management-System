@@ -18,15 +18,16 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
             newVehicle,
             { status: 201 }
         )
-    }catch(error: any){
+    } catch (error: unknown) {
         console.error("Vehicle creation route caught an error:", error);
+        const err = error as { status?: number; message?: string };
 
-        if (error.status) {
-            return NextResponse.json({ error: error.message }, { status: error.status });
+        if (err.status) {
+            return NextResponse.json({ error: err.message }, { status: err.status });
         }
 
         return NextResponse.json(
-            { error: "Internal Server Error", details: error.message },
+            { error: "Internal Server Error", details: err.message },
             { status: 500 }
         );
     }

@@ -16,14 +16,22 @@ interface CurrentUser {
     role: "ClientUser" | "InternalUser";
 }
 
+interface StatusError extends Error {
+    status?: number;
+}
+
+function createStatusError(message: string, status: number): StatusError {
+    const error = new Error(message) as StatusError;
+    error.status = status;
+    return error;
+}
+
 export async function createComment(data: CreateCommentInput, user: CurrentUser, incidentId: number) {
     const { body, visibility } = data;
     
     // 1. Validation Checks
     if (!body || !user.userId || !incidentId) {
-        const error = new Error("Missing required fields");
-        (error as any).status = 400;
-        throw error;
+        throw createStatusError("Missing required fields", 400);
     }
     
     const incidentExistence = await db.query.incidents.findFirst({
@@ -31,17 +39,13 @@ export async function createComment(data: CreateCommentInput, user: CurrentUser,
     });
     
     if (!incidentExistence) {
-        const error = new Error("Incident Not Found !");
-        (error as any).status = 404;
-        throw error;
+        throw createStatusError("Incident Not Found !", 404);
     }
     
     // 2. Role-based Authorization Checks
     if (user.role === "ClientUser") {
         if (user.userId !== incidentExistence.reportedById) {
-            const error = new Error("Forbidden: You cannot comment on this incident!");
-            (error as any).status = 403;
-            throw error;
+            throw createStatusError("Forbidden: You cannot comment on this incident!", 403);
         }
     } else {
         // Internal User Checks
@@ -50,16 +54,12 @@ export async function createComment(data: CreateCommentInput, user: CurrentUser,
         });
         
         if (!internalUserRecord) {
-            const error = new Error("Forbidden: You cannot comment on this incident!");
-            (error as any).status = 403;
-            throw error;
+            throw createStatusError("Forbidden: You cannot comment on this incident!", 403);
         }
         
         // Enforce the isActive check
         if (!internalUserRecord.isActive) {
-            const error = new Error("Forbidden: Your account is inactive.");
-            (error as any).status = 403;
-            throw error;
+            throw createStatusError("Forbidden: Your account is inactive.", 403);
         }
         
         // Technician Checks
@@ -69,9 +69,7 @@ export async function createComment(data: CreateCommentInput, user: CurrentUser,
             });
             
             if (!techRecord || techRecord.id !== incidentExistence.assignedToId) {
-                const error = new Error("Forbidden: You cannot comment on this incident!");
-                (error as any).status = 403;
-                throw error;
+                throw createStatusError("Forbidden: You cannot comment on this incident!", 403);
             }
         }
     }
@@ -91,9 +89,7 @@ export async function updateComment(visibility: CommentVisibility, user: Current
     
     // 1. Validation Checks
     if (!visibility || !user.userId || !incidentId || !commentId) {
-        const error = new Error("Missing required fields");
-        (error as any).status = 400;
-        throw error;
+        throw createStatusError("Missing required fields", 400);
     }
     
     const incidentExistence = await db.query.incidents.findFirst({
@@ -105,15 +101,11 @@ export async function updateComment(visibility: CommentVisibility, user: Current
     });
     
     if (!incidentExistence || !commentExistence) {
-        const error = new Error("Incident or Comment Not Found !");
-        (error as any).status = 404;
-        throw error;
+        throw createStatusError("Incident or Comment Not Found !", 404);
     }
 
     if (commentExistence.incidentId !== incidentId) {
-        const error = new Error("Forbidden: Comment does not belong to this incident!");
-        (error as any).status = 400;
-        throw error;
+        throw createStatusError("Forbidden: Comment does not belong to this incident!", 400);
     }
     
     // 2. Role-based Authorization Checks
@@ -121,9 +113,7 @@ export async function updateComment(visibility: CommentVisibility, user: Current
 
     if (user.role === "ClientUser") {
         if ((user.userId !== incidentExistence.reportedById) || (user.userId !== commentExistence.userId)) {
-            const error = new Error("Forbidden: You cannot update this comment!");
-            (error as any).status = 403;
-            throw error;
+            throw createStatusError("Forbidden: You cannot update this comment!", 403);
         }
     } else {
         // Internal User Checks
@@ -132,16 +122,12 @@ export async function updateComment(visibility: CommentVisibility, user: Current
         });
         
         if (!internalUserRecord) {
-            const error = new Error("Forbidden: You cannot update this comment!");
-            (error as any).status = 403;
-            throw error;
+            throw createStatusError("Forbidden: You cannot update this comment!", 403);
         }
         
         // Enforce the isActive check
         if (!internalUserRecord.isActive) {
-            const error = new Error("Forbidden: Your account is inactive.");
-            (error as any).status = 403;
-            throw error;
+            throw createStatusError("Forbidden: Your account is inactive.", 403);
         }
 
         isAdmin = internalUserRecord.internalRole === "Admin";
@@ -153,18 +139,14 @@ export async function updateComment(visibility: CommentVisibility, user: Current
             });
             
             if (!techRecord || techRecord.id !== incidentExistence.assignedToId) {
-                const error = new Error("Forbidden: You cannot update this comment!");
-                (error as any).status = 403;
-                throw error;
+                throw createStatusError("Forbidden: You cannot update this comment!", 403);
             }
         }
     }
 
     // 3. Final Security Check: Only the author can update their own comment, unless they are an Admin
     if (!isAdmin && commentExistence.userId !== user.userId) {
-        const error = new Error("Forbidden: You can only modify visibility of your own comments.");
-        (error as any).status = 403;
-        throw error;
+        throw createStatusError("Forbidden: You can only modify visibility of your own comments.", 403);
     }
     
     // 4. Update Database (With WHERE clause and updating visibility ONLY)

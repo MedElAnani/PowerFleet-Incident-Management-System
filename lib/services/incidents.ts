@@ -2,6 +2,16 @@ import { db } from "@/db";
 import { incidents, clients, vehicles, internal_users, technicians, support_managers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
+interface StatusError extends Error {
+    status?: number;
+}
+
+function createStatusError(message: string, status: number): StatusError {
+    const error = new Error(message) as StatusError;
+    error.status = status;
+    return error;
+}
+
 type IncidentType = 
     | "GPS Device" | "Vehicle" | "Driver" | "Client Complaint" 
     | "Accident" | "Fuel" | "Mission" | "Maintenance" 
@@ -29,9 +39,7 @@ export async function createIncident(data: CreateIncidentInput, authenticatedUse
 
     // Checking Variables Existence
     if (!title || !description || !type || !address || !vehicleId) {
-        const error = new Error("Missing required fields");
-        (error as any).status = 400;
-        throw error;
+        throw createStatusError("Missing required fields", 400);
     }
 
     // Fetch For The Client Record
@@ -41,9 +49,7 @@ export async function createIncident(data: CreateIncidentInput, authenticatedUse
 
     // Checking Client Existence
     if (!clientRecord) {
-        const error = new Error("No client profile associated with this user account.");
-        (error as any).status = 404;
-        throw error;
+        throw createStatusError("No client profile associated with this user account.", 404);
     }
 
     // Fetch For The Vehicle Record
@@ -53,16 +59,12 @@ export async function createIncident(data: CreateIncidentInput, authenticatedUse
 
     // Checking Vehicle Existence
     if (!vehicle) {
-        const error = new Error("Vehicle not found");
-        (error as any).status = 404;
-        throw error;
+        throw createStatusError("Vehicle not found", 404);
     }
 
     // Checking Of Relation Between Client And The Vehicle
     if (vehicle.clientId !== clientRecord.id) {
-        const error = new Error("You can only report incidents for your own vehicles.");
-        (error as any).status = 403;
-        throw error;
+        throw createStatusError("You can only report incidents for your own vehicles.", 403);
     }
 
     const [newIncident] = await db.insert(incidents).values({
@@ -174,9 +176,7 @@ export async function updateIncident(
     });
 
     if (!incident) {
-        const error = new Error("Incident Not Found!");
-        (error as any).status = 404;
-        throw error;
+        throw createStatusError("Incident Not Found!", 404);
     }
 
     // ---- ClientUser: own incidents only, description only ----
@@ -186,9 +186,7 @@ export async function updateIncident(
         });
 
         if (!clientRecord || incident.clientId !== clientRecord.id) {
-            const error = new Error("Forbidden: You cannot access this incident!");
-            (error as any).status = 403;
-            throw error;
+            throw createStatusError("Forbidden: You cannot access this incident!", 403);
         }
 
         const [updatedIncident] = await db
@@ -211,15 +209,11 @@ export async function updateIncident(
     });
 
     if (!internalUserRecord) {
-        const error = new Error("Forbidden: You cannot access this incident!");
-        (error as any).status = 403;
-        throw error;
+        throw createStatusError("Forbidden: You cannot access this incident!", 403);
     }
 
     if (!internalUserRecord.isActive) {
-        const error = new Error("Forbidden: Your account is inactive and cannot make changes.");
-        (error as any).status = 403;
-        throw error;
+        throw createStatusError("Forbidden: Your account is inactive and cannot make changes.", 403);
     }
 
     // ---- Admin: unrestricted — any field, any status transition ----
@@ -242,9 +236,7 @@ export async function updateIncident(
     // ---- Support Manager: can assign, can set priority/status, cannot close/cancel ----
     if (internalUserRecord.internalRole === "Support Manager") {
         if (status === "Closed" || status === "Cancelled") {
-            const error = new Error("Forbidden: Support Managers cannot close or cancel an incident.");
-            (error as any).status = 403;
-            throw error;
+            throw createStatusError("Forbidden: Support Managers cannot close or cancel an incident.", 403);
         }
         
         if (assignedToId !== undefined) {
@@ -252,9 +244,7 @@ export async function updateIncident(
                 where: eq(support_managers.internalUserId, internalUserRecord.id)
             });
             if (!smRecord || !smRecord.canAssign) {
-                const error = new Error("Forbidden: You do not have permission to assign incidents.");
-                (error as any).status = 403;
-                throw error;
+                throw createStatusError("Forbidden: You do not have permission to assign incidents.", 403);
             }
         }
 
@@ -280,15 +270,11 @@ export async function updateIncident(
         });
 
         if (!techRecord || incident.assignedToId !== techRecord.id) {
-            const error = new Error("Forbidden: This incident is not assigned to you.");
-            (error as any).status = 403;
-            throw error;
+            throw createStatusError("Forbidden: This incident is not assigned to you.", 403);
         }
 
         if (status === "Closed" || status === "Cancelled") {
-            const error = new Error("Forbidden: Technicians cannot close or cancel an incident.");
-            (error as any).status = 403;
-            throw error;
+            throw createStatusError("Forbidden: Technicians cannot close or cancel an incident.", 403);
         }
 
         const [updatedIncident] = await db
@@ -304,7 +290,5 @@ export async function updateIncident(
         return updatedIncident;
     }
 
-    const error = new Error("Forbidden: Unrecognized role.");
-    (error as any).status = 403;
-    throw error;
+    throw createStatusError("Forbidden: Unrecognized role.", 403);
 }

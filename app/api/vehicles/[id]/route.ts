@@ -49,10 +49,11 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         // Returns the clear incident layout safely
         return NextResponse.json(vehicle);
 
-    } catch (error: any) {
-        if (error.status) {
-            return NextResponse.json({ error: error.message }, { status: error.status });
+    } catch (error: unknown) {
+        const err = error as { status?: number; message?: string };
+        if (err.status) {
+            return NextResponse.json({ error: err.message }, { status: err.status });
         }
-        return NextResponse.json({ error: "Internal Server Error", details: error.message }, { status: 500 });
+        return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
     }
 });

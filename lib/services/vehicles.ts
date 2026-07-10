@@ -2,6 +2,16 @@ import { db } from '@/db'
 import { clients, vehicles, internal_users } from '@/db/schema'
 import { eq, and, or } from 'drizzle-orm'
 
+interface StatusError extends Error {
+    status?: number;
+}
+
+function createStatusError(message: string, status: number): StatusError {
+    const error = new Error(message) as StatusError;
+    error.status = status;
+    return error;
+}
+
 interface CreateVehicleInput {
     name: string
     imei: string
@@ -14,9 +24,7 @@ export async function createVehicle(data: CreateVehicleInput, authenticatedUserI
     
     // Checking Variables Existence
     if(!name || !imei || !licensePlate) {
-        const error = new Error("Missing required fields");
-        (error as any).status = 400;
-        throw error;
+        throw createStatusError("Missing required fields", 400);
     }
     
     const adminRecord  = await db.query.internal_users.findFirst({
@@ -29,9 +37,7 @@ export async function createVehicle(data: CreateVehicleInput, authenticatedUserI
     
     // Checking InternalUser Existence
     if (!adminRecord) {
-        const error = new Error("Only an Admin can perform this action.");
-        (error as any).status = 403;
-        throw error;
+        throw createStatusError("Only an Admin can perform this action.", 403);
     }
     
     // Fetch For The Client Record
@@ -41,9 +47,7 @@ export async function createVehicle(data: CreateVehicleInput, authenticatedUserI
     
     // Checking Client Existence
     if (!clientRecord) {
-        const error = new Error("No client profile associated with this user account.");
-        (error as any).status = 404;
-        throw error;
+        throw createStatusError("No client profile associated with this user account.", 404);
     }
     
     // Fetch For The Vehicle Record
@@ -56,9 +60,7 @@ export async function createVehicle(data: CreateVehicleInput, authenticatedUserI
     
     // Checking Vehicle Existence
     if(vehicleRecord){
-        const error = new Error('This vehicle already exist !');
-        (error as any).status = 400
-        throw error
+        throw createStatusError("This vehicle already exist !", 400);
     }
     
     const [newVehicle] = await db.insert(vehicles).values({

@@ -8,11 +8,10 @@ import { users, internal_users, clients, vehicles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 describe("Vehicles API Endpoints", () => {
-    let adminUser: any;
-    let clientUser1: any;
-    let clientUser2: any;
-    let clientProfile1: any;
-    let clientProfile2: any;
+    let adminUser: { id: number } | undefined;
+    let clientUser1: { id: number } | undefined;
+    let clientUser2: { id: number } | undefined;
+    let clientProfile1: { id: number } | undefined;
     let adminToken: string;
     let clientToken1: string;
     let clientToken2: string;
@@ -62,12 +61,11 @@ describe("Vehicles API Endpoints", () => {
         }).returning();
         clientUser2 = client2;
 
-        const [profile2] = await db.insert(clients).values({
+        await db.insert(clients).values({
             companyName: "Client 2 Corp",
             phone: "654321",
             userId: client2.id
-        }).returning();
-        clientProfile2 = profile2;
+        });
         clientToken2 = jwt.sign({ userID: client2.id, userROLE: "ClientUser" }, process.env.JWT_SECRET!);
     });
 
@@ -91,7 +89,7 @@ describe("Vehicles API Endpoints", () => {
                 name: "Truck #1",
                 imei: "IMEI-TEST-12345",
                 licensePlate: "PLATE-12345",
-                clientId: clientProfile1.id
+                clientId: clientProfile1!.id
             })
         });
 
@@ -100,7 +98,7 @@ describe("Vehicles API Endpoints", () => {
 
         expect(res.status).toBe(201);
         expect(data.name).toBe("Truck #1");
-        expect(data.clientId).toBe(clientProfile1.id);
+        expect(data.clientId).toBe(clientProfile1!.id);
         createdVehicleId = data.id;
     });
 
@@ -114,7 +112,7 @@ describe("Vehicles API Endpoints", () => {
                 name: "Truck #2",
                 imei: "IMEI-TEST-54321",
                 licensePlate: "PLATE-54321",
-                clientId: clientProfile1.id
+                clientId: clientProfile1!.id
             })
         });
 

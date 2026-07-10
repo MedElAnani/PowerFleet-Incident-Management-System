@@ -2,21 +2,21 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
 import { GET as listIncidentsGET, POST as createIncidentPOST } from "@/app/api/incidents/route";
-import { GET as getIncidentGET, PATCH as updateIncidentPATCH } from "@/app/api/incidents/[id]/route";
+import { PATCH as updateIncidentPATCH } from "@/app/api/incidents/[id]/route";
 import { db } from "@/db";
 import { users, internal_users, admins, clients, vehicles, incidents, technicians, support_managers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 describe("Incidents API Endpoints", () => {
-    let adminUser: any, adminToken: string;
-    let managerUser: any, managerToken: string;
-    let techUser: any, techRecord: any, techToken: string;
-    let inactiveUser: any, inactiveToken: string;
-    let clientUser1: any, clientProfile1: any, clientToken1: string;
-    let clientUser2: any, clientProfile2: any, clientToken2: string;
+    let adminUser: { id: number } | undefined, adminToken: string;
+    let managerUser: { id: number } | undefined, managerToken: string;
+    let techUser: { id: number } | undefined, techRecord: { id: number } | undefined, techToken: string;
+    let inactiveUser: { id: number } | undefined, inactiveToken: string;
+    let clientUser1: { id: number } | undefined, clientProfile1: { id: number } | undefined, clientToken1: string;
+    let clientUser2: { id: number } | undefined, clientProfile2: { id: number } | undefined;
 
-    let vehicle1: any;
-    let vehicle2: any;
+    let vehicle1: { id: number } | undefined;
+    let vehicle2: { id: number } | undefined;
     let createdIncidentId: number;
 
     beforeAll(async () => {
@@ -89,7 +89,6 @@ describe("Incidents API Endpoints", () => {
             companyName: "Client 2 Corp", phone: "222", userId: client2.id
         }).returning();
         clientProfile2 = profile2;
-        clientToken2 = jwt.sign({ userID: client2.id, userROLE: "ClientUser" }, process.env.JWT_SECRET!);
 
         // 6. Create Vehicles
         const [v1] = await db.insert(vehicles).values({
@@ -127,7 +126,7 @@ describe("Incidents API Endpoints", () => {
                 description: "Cannot connect to central server",
                 type: "GPS Device",
                 address: "123 Main St",
-                vehicleId: vehicle1.id
+                vehicleId: vehicle1!.id
             })
         });
 
@@ -148,7 +147,7 @@ describe("Incidents API Endpoints", () => {
                 description: "Trying to hijack vehicle 2",
                 type: "GPS Device",
                 address: "123 Main St",
-                vehicleId: vehicle2.id
+                vehicleId: vehicle2!.id
             })
         });
 
@@ -167,8 +166,8 @@ describe("Incidents API Endpoints", () => {
 
         expect(res.status).toBe(200);
         expect(data.length).toBeGreaterThan(0);
-        data.forEach((inc: any) => {
-            expect(inc.clientId).toBe(clientProfile1.id);
+        data.forEach((inc: { clientId: number }) => {
+            expect(inc.clientId).toBe(clientProfile1!.id);
         });
     });
 
@@ -177,7 +176,7 @@ describe("Incidents API Endpoints", () => {
             method: "PATCH",
             headers: { "Authorization": `Bearer ${managerToken}` },
             body: JSON.stringify({
-                assignedToId: techRecord.id,
+                assignedToId: techRecord!.id,
                 status: "Open"
             })
         });
@@ -186,7 +185,7 @@ describe("Incidents API Endpoints", () => {
         const data = await res.json();
 
         expect(res.status).toBe(200);
-        expect(data.assignedToId).toBe(techRecord.id);
+        expect(data.assignedToId).toBe(techRecord!.id);
         expect(data.status).toBe("Open");
     });
 

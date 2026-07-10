@@ -5,18 +5,18 @@ import { POST as createCommentPOST } from "@/app/api/incidents/[id]/comments/rou
 import { PATCH as updateCommentPATCH } from "@/app/api/incidents/[id]/comments/[commentId]/route";
 import { GET as getIncidentGET } from "@/app/api/incidents/[id]/route";
 import { db } from "@/db";
-import { users, internal_users, admins, clients, vehicles, incidents, technicians, support_managers, incident_comments } from "@/db/schema";
+import { users, internal_users, admins, clients, vehicles, incidents, technicians, incident_comments } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 describe("Comments API & Visibility Endpoints", () => {
-    let adminUser: any, adminToken: string;
-    let techUser1: any, techRecord1: any, techToken1: string;
-    let techUser2: any, techRecord2: any, techToken2: string;
-    let clientUser: any, clientProfile: any, clientToken: string;
+    let adminUser: { id: number } | undefined, adminToken: string;
+    let techUser1: { id: number } | undefined, techRecord1: { id: number } | undefined, techToken1: string;
+    let techUser2: { id: number } | undefined, techToken2: string;
+    let clientUser: { id: number } | undefined, clientProfile: { id: number } | undefined, clientToken: string;
 
-    let vehicle: any;
-    let incident: any;
-    let commentIds: number[] = [];
+    let vehicle: { id: number } | undefined;
+    let incident: { id: number } | undefined;
+    const commentIds: number[] = [];
 
     beforeAll(async () => {
         // 1. Create Admin
@@ -65,15 +65,14 @@ describe("Comments API & Visibility Endpoints", () => {
         const [techInt2] = await db.insert(internal_users).values({
             userId: tech2.id, internalRole: "Technician", department: "IT Support", isActive: true
         }).returning();
-        const [techRec2] = await db.insert(technicians).values({
+        await db.insert(technicians).values({
             internalUserId: techInt2.id, specialty: "GPS Tracking", isAvailable: true
-        }).returning();
-        techRecord2 = techRec2;
+        });
         techToken2 = jwt.sign({ userID: tech2.id, userROLE: "InternalUser" }, process.env.JWT_SECRET!);
 
         // 5. Create Vehicle
         const [v] = await db.insert(vehicles).values({
-            name: "Van", imei: "IMEI-C1", licensePlate: "PLATE-C1", clientId: clientProfile.id
+            name: "Van", imei: "IMEI-C1", licensePlate: "PLATE-C1", clientId: clientProfile!.id
         }).returning();
         vehicle = v;
 
@@ -83,10 +82,10 @@ describe("Comments API & Visibility Endpoints", () => {
             description: "GPS is malfunctioning",
             type: "GPS Device",
             address: "123 Test St",
-            vehicleId: vehicle.id,
-            clientId: clientProfile.id,
-            reportedById: clientUser.id,
-            assignedToId: techRecord1.id,
+            vehicleId: vehicle!.id,
+            clientId: clientProfile!.id,
+            reportedById: clientUser!.id,
+            assignedToId: techRecord1!.id,
             status: "Open"
         }).returning();
         incident = inc;
@@ -108,7 +107,7 @@ describe("Comments API & Visibility Endpoints", () => {
     });
 
     it("should allow Client to comment on their own incident", async () => {
-        const req = new NextRequest(`http://localhost/api/incidents/${incident.id}/comments`, {
+        const req = new NextRequest(`http://localhost/api/incidents/${incident!.id}/comments`, {
             method: "POST",
             headers: { "Authorization": `Bearer ${clientToken}` },
             body: JSON.stringify({
@@ -117,7 +116,7 @@ describe("Comments API & Visibility Endpoints", () => {
             })
         });
 
-        const res = await createCommentPOST(req, { params: Promise.resolve({ id: String(incident.id) }) });
+        const res = await createCommentPOST(req, { params: Promise.resolve({ id: String(incident!.id) }) });
         const data = await res.json();
 
         expect(res.status).toBe(201);
@@ -126,7 +125,7 @@ describe("Comments API & Visibility Endpoints", () => {
     });
 
     it("should allow Technician to post a Private comment on their assigned incident", async () => {
-        const req = new NextRequest(`http://localhost/api/incidents/${incident.id}/comments`, {
+        const req = new NextRequest(`http://localhost/api/incidents/${incident!.id}/comments`, {
             method: "POST",
             headers: { "Authorization": `Bearer ${techToken1}` },
             body: JSON.stringify({
@@ -135,7 +134,7 @@ describe("Comments API & Visibility Endpoints", () => {
             })
         });
 
-        const res = await createCommentPOST(req, { params: Promise.resolve({ id: String(incident.id) }) });
+        const res = await createCommentPOST(req, { params: Promise.resolve({ id: String(incident!.id) }) });
         const data = await res.json();
 
         expect(res.status).toBe(201);
@@ -144,7 +143,7 @@ describe("Comments API & Visibility Endpoints", () => {
     });
 
     it("should prevent Unassigned Technician from commenting", async () => {
-        const req = new NextRequest(`http://localhost/api/incidents/${incident.id}/comments`, {
+        const req = new NextRequest(`http://localhost/api/incidents/${incident!.id}/comments`, {
             method: "POST",
             headers: { "Authorization": `Bearer ${techToken2}` },
             body: JSON.stringify({
@@ -153,20 +152,20 @@ describe("Comments API & Visibility Endpoints", () => {
             })
         });
 
-        const res = await createCommentPOST(req, { params: Promise.resolve({ id: String(incident.id) }) });
+        const res = await createCommentPOST(req, { params: Promise.resolve({ id: String(incident!.id) }) });
         expect(res.status).toBe(403);
     });
 
     it("should allow Author to toggle visibility of their own comment", async () => {
         // Comment ID is the first one posted (Client's comment)
         const targetId = commentIds[0];
-        const req = new NextRequest(`http://localhost/api/incidents/${incident.id}/comments/${targetId}`, {
+        const req = new NextRequest(`http://localhost/api/incidents/${incident!.id}/comments/${targetId}`, {
             method: "PATCH",
             headers: { "Authorization": `Bearer ${clientToken}` },
             body: JSON.stringify({ visibility: "Private" })
         });
 
-        const res = await updateCommentPATCH(req, { params: Promise.resolve({ id: String(incident.id), commentId: String(targetId) }) });
+        const res = await updateCommentPATCH(req, { params: Promise.resolve({ id: String(incident!.id), commentId: String(targetId) }) });
         const data = await res.json();
 
         expect(res.status).toBe(200);
@@ -176,26 +175,26 @@ describe("Comments API & Visibility Endpoints", () => {
     it("should prevent Non-author from toggling comment visibility", async () => {
         // Client tries to edit Tech's comment (second one)
         const targetId = commentIds[1];
-        const req = new NextRequest(`http://localhost/api/incidents/${incident.id}/comments/${targetId}`, {
+        const req = new NextRequest(`http://localhost/api/incidents/${incident!.id}/comments/${targetId}`, {
             method: "PATCH",
             headers: { "Authorization": `Bearer ${clientToken}` },
             body: JSON.stringify({ visibility: "Public" })
         });
 
-        const res = await updateCommentPATCH(req, { params: Promise.resolve({ id: String(incident.id), commentId: String(targetId) }) });
+        const res = await updateCommentPATCH(req, { params: Promise.resolve({ id: String(incident!.id), commentId: String(targetId) }) });
         expect(res.status).toBe(403);
     });
 
     it("should allow Admin to toggle visibility of anyone's comment", async () => {
         // Admin overrides visibility of Client's comment back to Public
         const targetId = commentIds[0];
-        const req = new NextRequest(`http://localhost/api/incidents/${incident.id}/comments/${targetId}`, {
+        const req = new NextRequest(`http://localhost/api/incidents/${incident!.id}/comments/${targetId}`, {
             method: "PATCH",
             headers: { "Authorization": `Bearer ${adminToken}` },
             body: JSON.stringify({ visibility: "Public" })
         });
 
-        const res = await updateCommentPATCH(req, { params: Promise.resolve({ id: String(incident.id), commentId: String(targetId) }) });
+        const res = await updateCommentPATCH(req, { params: Promise.resolve({ id: String(incident!.id), commentId: String(targetId) }) });
         const data = await res.json();
 
         expect(res.status).toBe(200);
@@ -213,17 +212,17 @@ describe("Comments API & Visibility Endpoints", () => {
         await db.update(incident_comments).set({ visibility: "Private" }).where(eq(incident_comments.id, techCommentId));
 
         // Get details as Client
-        const req = new NextRequest(`http://localhost/api/incidents/${incident.id}`, {
+        const req = new NextRequest(`http://localhost/api/incidents/${incident!.id}`, {
             method: "GET",
             headers: { "Authorization": `Bearer ${clientToken}` }
         });
 
-        const res = await getIncidentGET(req, { params: Promise.resolve({ id: String(incident.id) }) });
+        const res = await getIncidentGET(req, { params: Promise.resolve({ id: String(incident!.id) }) });
         const data = await res.json();
 
         expect(res.status).toBe(200);
         // Client should see their own Private comment, but not the Tech's Private comment.
-        const visibleCommentIds = data.comments.map((c: any) => c.id);
+        const visibleCommentIds = data.comments.map((c: { id: number }) => c.id);
         expect(visibleCommentIds).toContain(clientCommentId);
         expect(visibleCommentIds).not.toContain(techCommentId);
     });
@@ -233,17 +232,17 @@ describe("Comments API & Visibility Endpoints", () => {
         const techCommentId = commentIds[1];
 
         // Get details as Technician
-        const req = new NextRequest(`http://localhost/api/incidents/${incident.id}`, {
+        const req = new NextRequest(`http://localhost/api/incidents/${incident!.id}`, {
             method: "GET",
             headers: { "Authorization": `Bearer ${techToken1}` }
         });
 
-        const res = await getIncidentGET(req, { params: Promise.resolve({ id: String(incident.id) }) });
+        const res = await getIncidentGET(req, { params: Promise.resolve({ id: String(incident!.id) }) });
         const data = await res.json();
 
         expect(res.status).toBe(200);
         // Technician should see their own Private comment, but not the Client's Private comment.
-        const visibleCommentIds = data.comments.map((c: any) => c.id);
+        const visibleCommentIds = data.comments.map((c: { id: number }) => c.id);
         expect(visibleCommentIds).toContain(techCommentId);
         expect(visibleCommentIds).not.toContain(clientCommentId);
     });
