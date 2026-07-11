@@ -8,6 +8,14 @@ export const typeEnum = pgEnum("incident_type", ["GPS Device", "Vehicle", "Drive
 export const adminLevelEnum = pgEnum("admin_access_level", ["Technician", "Support Manager", "Admin"])
 export const internalRoleEnum = pgEnum("internal_user_role", ["Technician", "Support Manager", "Admin"])
 export const visibilityEnum = pgEnum("incident_comments_visibility", ["Public", "Private"])
+export const eventTypeEnum = pgEnum("event_type_enum", [
+    "create_incident",
+    "comment",
+    "status_changed",
+    "priority_changed",
+    "technician_assigned",
+]);
+
 
 // 1. User Table
 
@@ -85,7 +93,9 @@ export const vehicles = pgTable("vehicles", {
     createdAt: timestamp('created_at').defaultNow(),
     clientId: integer('client_id')
         .references(() => clients.id, { onDelete: "cascade" })
-        .notNull()
+        .notNull(),
+    createdBy: integer('user_id')
+        .references(() => users.id, { onDelete: "cascade" })
 })
 
 // 8. Incidents Table
@@ -132,3 +142,19 @@ export const incident_comments = pgTable('incident_comments', {
         .references(() => incidents.id, { onDelete: 'cascade' })
         .notNull()
 })
+
+// 10. Incident Events Table
+
+export const incident_events = pgTable("incident_events", {
+    id: serial('id').primaryKey(),
+    incidentId: integer('incident_id')
+        .references(() => incidents.id, { onDelete: 'cascade' })
+        .notNull(),
+    userId: integer('user_id')
+        .references(() => users.id, { onDelete: 'cascade' }),
+    eventType: eventTypeEnum('event_type').notNull(),
+    oldValue: text('old_value'),
+    newValue: text('new_value'),
+    message: text('message').notNull(),
+    createdAt: timestamp('created_at').defaultNow()
+});

@@ -8,7 +8,8 @@ import {
     clients, 
     vehicles, 
     incidents,
-    incident_comments
+    incident_comments,
+    incident_events
 } from "./schema";
 
 // 1. User Table Relations
@@ -17,6 +18,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     internalProfile: one(internal_users),
     reportedIncidents: many(incidents),
     comments: many(incident_comments),
+    events: many(incident_events),
+    createdVehicles: many(vehicles),
 }));
 
 // 2. Internal Users Table Relations
@@ -68,6 +71,10 @@ export const vehiclesRelations = relations(vehicles, ({ one, many }) => ({
         fields: [vehicles.clientId],
         references: [clients.id],
     }),
+    creator: one(users, {
+        fields: [vehicles.createdBy],
+        references: [users.id],
+    }),
     incidents: many(incidents),
 }));
 
@@ -90,6 +97,7 @@ export const incidentsRelations = relations(incidents, ({ one, many }) => ({
         references: [technicians.id],
     }),
     comments: many(incident_comments),
+    events: many(incident_events),
 }));
 
 // 6. Incident Comments Table Relations
@@ -101,5 +109,17 @@ export const incidentCommentsRelations = relations(incident_comments, ({ one }) 
     incident: one(incidents, {
         fields: [incident_comments.incidentId],
         references: [incidents.id],
+    }),
+}));
+
+// 7. Incident Events Table Relations
+export const incidentEventsRelations = relations(incident_events, ({ one }) => ({
+    incident: one(incidents, {
+        fields: [incident_events.incidentId],
+        references: [incidents.id],
+    }),
+    user: one(users, {
+        fields: [incident_events.userId],
+        references: [users.id],
     }),
 }));

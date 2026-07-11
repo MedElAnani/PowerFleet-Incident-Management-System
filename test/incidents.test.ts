@@ -177,7 +177,8 @@ describe("Incidents API Endpoints", () => {
             headers: { "Authorization": `Bearer ${managerToken}` },
             body: JSON.stringify({
                 assignedToId: techRecord!.id,
-                status: "Open"
+                status: "Open",
+                message: "Assigning technician"
             })
         });
 
@@ -194,7 +195,8 @@ describe("Incidents API Endpoints", () => {
             method: "PATCH",
             headers: { "Authorization": `Bearer ${techToken}` },
             body: JSON.stringify({
-                status: "Closed"
+                status: "Closed",
+                message: "Trying to close"
             })
         });
 
@@ -207,7 +209,8 @@ describe("Incidents API Endpoints", () => {
             method: "PATCH",
             headers: { "Authorization": `Bearer ${techToken}` },
             body: JSON.stringify({
-                status: "In Progress"
+                status: "In Progress",
+                message: "Tech starting work"
             })
         });
 
@@ -223,7 +226,8 @@ describe("Incidents API Endpoints", () => {
             method: "PATCH",
             headers: { "Authorization": `Bearer ${inactiveToken}` },
             body: JSON.stringify({
-                status: "Resolved"
+                status: "Resolved",
+                message: "Inactive test"
             })
         });
 
@@ -236,7 +240,8 @@ describe("Incidents API Endpoints", () => {
             method: "PATCH",
             headers: { "Authorization": `Bearer ${adminToken}` },
             body: JSON.stringify({
-                status: "Resolved"
+                status: "Resolved",
+                message: "Resolving incident"
             })
         });
 

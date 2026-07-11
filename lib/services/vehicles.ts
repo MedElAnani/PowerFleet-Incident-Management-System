@@ -67,7 +67,8 @@ export async function createVehicle(data: CreateVehicleInput, authenticatedUserI
         name,
         imei,
         licensePlate,
-        clientId
+        clientId,
+        createdBy: authenticatedUserId
     }).returning();
     
     return newVehicle;

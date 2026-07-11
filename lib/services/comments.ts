@@ -1,6 +1,7 @@
 import { db } from '@/db'
 import { internal_users, incidents, technicians, incident_comments } from '@/db/schema'
 import { eq } from "drizzle-orm";
+import { auditLogChanges } from './audit';
 
 type CommentVisibility = 
     | "Public" | "Private"
@@ -81,6 +82,17 @@ export async function createComment(data: CreateCommentInput, user: CurrentUser,
         userId: user.userId,
         incidentId
     }).returning();
+    
+    const userId = user.userId
+    
+    if(newComment){
+        await auditLogChanges({
+            incidentId,
+            userId,
+            logType: 'comment',
+            newRecord: newComment
+        })
+    }
     
     return newComment;
 }

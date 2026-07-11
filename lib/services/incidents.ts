@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { incidents, clients, vehicles, internal_users, technicians, support_managers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { auditLogChanges } from "./audit";
 
 interface StatusError extends Error {
     status?: number;
@@ -78,6 +79,17 @@ export async function createIncident(data: CreateIncidentInput, authenticatedUse
         clientId: clientRecord.id,
         reportedById: authenticatedUserId,
     }).returning();
+    
+    const incidentId = newIncident.id
+    
+    if(newIncident){
+        await auditLogChanges({
+            incidentId,
+            userId: authenticatedUserId,
+            logType: 'create',
+            newRecord: newIncident
+        })
+    }
 
     return newIncident;
 }
@@ -161,6 +173,7 @@ interface UpdateIncidentInput {
     priority?: IncidentPriority
     status?: IncidentStatus
     assignedToId?: number
+    message: string
 }
 
 export async function updateIncident(
@@ -169,7 +182,7 @@ export async function updateIncident(
     authenticatedUserRole: string,
     incidentId: number
 ) {
-    const { title, description, type, priority, status, assignedToId } = data;
+    const { title, description, type, priority, status, assignedToId, message } = data;
 
     const incident = await db.query.incidents.findFirst({
         where: eq(incidents.id, incidentId)
@@ -218,6 +231,10 @@ export async function updateIncident(
 
     // ---- Admin: unrestricted — any field, any status transition ----
     if (internalUserRecord.internalRole === "Admin") {
+        if(!message){
+            throw createStatusError("Message For This Action Is Required", 400);
+        }
+        
         const [updatedIncident] = await db
             .update(incidents)
             .set({
@@ -229,6 +246,15 @@ export async function updateIncident(
             })
             .where(eq(incidents.id, incidentId))
             .returning();
+
+        await auditLogChanges({
+            incidentId,
+            userId: authenticatedUserId,
+            logType: 'update',
+            oldRecord: incident,
+            newRecord: updatedIncident,
+            message
+        })
 
         return updatedIncident;
     }
@@ -247,6 +273,10 @@ export async function updateIncident(
                 throw createStatusError("Forbidden: You do not have permission to assign incidents.", 403);
             }
         }
+        
+        if(!message){
+            throw createStatusError("Message For This Action Is Required", 400);
+        }
 
         const [updatedIncident] = await db
             .update(incidents)
@@ -259,6 +289,15 @@ export async function updateIncident(
             })
             .where(eq(incidents.id, incidentId))
             .returning();
+            
+        await auditLogChanges({
+            incidentId,
+            userId: authenticatedUserId,
+            logType: 'update',
+            oldRecord: incident,
+            newRecord: updatedIncident,
+            message
+        })
 
         return updatedIncident;
     }
@@ -276,6 +315,10 @@ export async function updateIncident(
         if (status === "Closed" || status === "Cancelled") {
             throw createStatusError("Forbidden: Technicians cannot close or cancel an incident.", 403);
         }
+        
+        if(!message){
+            throw createStatusError("Message For This Action Is Required", 400);
+        }
 
         const [updatedIncident] = await db
             .update(incidents)
@@ -286,6 +329,15 @@ export async function updateIncident(
             })
             .where(eq(incidents.id, incidentId))
             .returning();
+
+        await auditLogChanges({
+            incidentId,
+            userId: authenticatedUserId,
+            logType: 'update',
+            oldRecord: incident,
+            newRecord: updatedIncident,
+            message
+        })
 
         return updatedIncident;
     }
