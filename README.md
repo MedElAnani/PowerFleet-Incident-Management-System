@@ -95,6 +95,7 @@ PostgreSQL Database
 | `vehicles`         | Fleet vehicles (IMEI, license plate)   |
 | `incidents`        | Incident reports with SLA tracking     |
 | `incident_comments`| Comments on incidents with visibility   |
+| `incident_events`  | Audit logs & timeline events history   |
 
 ### Enums
 
@@ -105,6 +106,7 @@ PostgreSQL Database
 - `incident_type` — `gps_issue`, `accident`, `fuel_problem`, `maintenance`, `other`
 - `admin_access_level` — `full`, `limited`
 - `incident_comments_visibility` — `Public`, `Private`
+- `event_type_enum` — `status_changed`, `priority_changed`, `technician_assigned`, `impact_calculated`, `details_updated`, `create_incident`, `comment`
 
 ### Key Relationships
 
@@ -116,6 +118,8 @@ PostgreSQL Database
 - `technicians` → `incidents` (1:N, assigned)
 - `users` → `incident_comments` (1:N)
 - `incidents` → `incident_comments` (1:N)
+- `incidents` → `incident_events` (1:N)
+- `users` → `incident_events` (1:N)
 
 ---
 
@@ -149,6 +153,8 @@ PostgreSQL Database
 | PATCH  | `/api/incidents/:id`                     | Update an incident                        | Any authenticated |
 | POST   | `/api/incidents/:id/comments`            | Add a comment to an incident              | Any authenticated |
 | PATCH  | `/api/incidents/:id/comments/:commentId` | Update visibility of a comment            | Any authenticated |
+| GET    | `/api/incidents/:id/events`              | Get incident history timeline events      | Any authenticated |
+| GET    | `/api/events`                            | List global system audit logs             | InternalUser      |
 
 ### Vehicles
 
@@ -212,12 +218,16 @@ powerfleet_ims/
 ├── app/                    # Next.js App Router
 │   ├── api/
 │   │   ├── auth/           # Authentication routes
+│   │   ├── events/
+│   │   │   └── route.ts      # GET list global system audit logs
 │   │   ├── incidents/      # Incident routes
 │   │   │   ├── [id]/
 │   │   │   │   ├── comments/
 │   │   │   │   │   ├── [commentId]/
 │   │   │   │   │   │   └── route.ts  # PATCH update comment visibility
 │   │   │   │   │   └── route.ts      # POST create comments
+│   │   │   │   ├── events/
+│   │   │   │   │   └── route.ts      # GET fetch incident timeline events
 │   │   │   │   └── route.ts          # GET/PATCH incident detail/update
 │   │   │   └── route.ts              # GET/POST list/create incidents
 │   │   └── vehicles/       # Vehicle routes
@@ -229,7 +239,9 @@ powerfleet_ims/
 │   └── index.ts            # Drizzle client
 ├── lib/
 │   └── services/           # Business logic
+│       ├── audit.ts        # Audit logging service
 │       ├── comments.ts     # Comment service
+│       ├── events.ts       # Events timeline retrieval service
 │       ├── incidents.ts    # Incident service
 │       └── vehicles.ts     # Vehicle service
 ├── middleware/
