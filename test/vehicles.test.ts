@@ -4,14 +4,14 @@ import jwt from "jsonwebtoken";
 import { POST as createVehiclePOST } from "@/app/api/vehicles/route";
 import { GET as getVehicleGET } from "@/app/api/vehicles/[id]/route";
 import { db } from "@/db";
-import { users, internal_users, clients, vehicles } from "@/db/schema";
+import { users, internal_users, clients, vehicles, admins } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 describe("Vehicles API Endpoints", () => {
     let adminUser: { id: number } | undefined;
     let clientUser1: { id: number } | undefined;
     let clientUser2: { id: number } | undefined;
-    let clientProfile1: { id: number } | undefined;
+    let clientProfile1: { userId: number } | undefined;
     let adminToken: string;
     let clientToken1: string;
     let clientToken2: string;
@@ -23,24 +23,25 @@ describe("Vehicles API Endpoints", () => {
             name: "Admin User",
             email: "admin_test_vehicles@example.com",
             password: "HashedPassword123!",
-            role: "InternalUser"
         }).returning();
         adminUser = admin;
 
-        await db.insert(internal_users).values({
+        const [adminInt] = await db.insert(internal_users).values({
             userId: admin.id,
-            internalRole: "Admin",
             department: "Engineering",
             isActive: true
+        }).returning();
+        await db.insert(admins).values({
+            internalUserId: adminInt.userId,
+            canManageUsers: true
         });
-        adminToken = jwt.sign({ userID: admin.id, userROLE: "InternalUser" }, process.env.JWT_SECRET!);
+        adminToken = jwt.sign({ userID: admin.id, userROLE: "Admin" }, process.env.JWT_SECRET!);
 
         // Create Client 1
         const [client1] = await db.insert(users).values({
             name: "Client 1",
             email: "client1_test_vehicles@example.com",
             password: "HashedPassword123!",
-            role: "ClientUser"
         }).returning();
         clientUser1 = client1;
 
@@ -57,7 +58,6 @@ describe("Vehicles API Endpoints", () => {
             name: "Client 2",
             email: "client2_test_vehicles@example.com",
             password: "HashedPassword123!",
-            role: "ClientUser"
         }).returning();
         clientUser2 = client2;
 
@@ -89,7 +89,7 @@ describe("Vehicles API Endpoints", () => {
                 name: "Truck #1",
                 imei: "IMEI-TEST-12345",
                 licensePlate: "PLATE-12345",
-                clientId: clientProfile1!.id
+                clientId: clientProfile1!.userId
             })
         });
 
@@ -98,7 +98,7 @@ describe("Vehicles API Endpoints", () => {
 
         expect(res.status).toBe(201);
         expect(data.name).toBe("Truck #1");
-        expect(data.clientId).toBe(clientProfile1!.id);
+        expect(data.clientId).toBe(clientProfile1!.userId);
         createdVehicleId = data.id;
     });
 
@@ -112,7 +112,7 @@ describe("Vehicles API Endpoints", () => {
                 name: "Truck #2",
                 imei: "IMEI-TEST-54321",
                 licensePlate: "PLATE-54321",
-                clientId: clientProfile1!.id
+                clientId: clientProfile1!.userId
             })
         });
 

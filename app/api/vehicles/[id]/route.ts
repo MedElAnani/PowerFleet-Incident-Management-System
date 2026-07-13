@@ -38,7 +38,7 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
                 where: eq(clients.userId, currentUser.userId),
             });
             
-            if (!clientRecord || vehicle.clientId !== clientRecord.id) {
+            if (!clientRecord || vehicle.clientId !== clientRecord.userId) {
                 return NextResponse.json(
                     { error: "Forbidden: You cannot access this vehicle!" }, 
                     { status: 403 }

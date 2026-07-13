@@ -10,10 +10,10 @@ import { eq } from "drizzle-orm";
 describe("Incidents API Endpoints", () => {
     let adminUser: { id: number } | undefined, adminToken: string;
     let managerUser: { id: number } | undefined, managerToken: string;
-    let techUser: { id: number } | undefined, techRecord: { id: number } | undefined, techToken: string;
+    let techUser: { id: number } | undefined, techRecord: { internalUserId: number } | undefined, techToken: string;
     let inactiveUser: { id: number } | undefined, inactiveToken: string;
-    let clientUser1: { id: number } | undefined, clientProfile1: { id: number } | undefined, clientToken1: string;
-    let clientUser2: { id: number } | undefined, clientProfile2: { id: number } | undefined;
+    let clientUser1: { id: number } | undefined, clientProfile1: { userId: number } | undefined, clientToken1: string;
+    let clientUser2: { id: number } | undefined, clientProfile2: { userId: number } | undefined;
 
     let vehicle1: { id: number } | undefined;
     let vehicle2: { id: number } | undefined;
@@ -22,57 +22,60 @@ describe("Incidents API Endpoints", () => {
     beforeAll(async () => {
         // 1. Create Admin
         const [admin] = await db.insert(users).values({
-            name: "Admin", email: "admin_test_incidents@example.com", password: "HashedPassword123!", role: "InternalUser"
+            name: "Admin", email: "admin_test_incidents@example.com", password: "HashedPassword123!"
         }).returning();
         adminUser = admin;
         const [adminInt] = await db.insert(internal_users).values({
-            userId: admin.id, internalRole: "Admin", department: "Oversight", isActive: true
+            userId: admin.id, department: "Oversight", isActive: true
         }).returning();
         await db.insert(admins).values({
-            internalUserId: adminInt.id, canManageUsers: true
+            internalUserId: adminInt.userId, canManageUsers: true
         });
-        adminToken = jwt.sign({ userID: admin.id, userROLE: "InternalUser" }, process.env.JWT_SECRET!);
+        adminToken = jwt.sign({ userID: admin.id, userROLE: "Admin" }, process.env.JWT_SECRET!);
 
         // 2. Create Support Manager
         const [manager] = await db.insert(users).values({
-            name: "Manager", email: "manager_test_incidents@example.com", password: "HashedPassword123!", role: "InternalUser"
+            name: "Manager", email: "manager_test_incidents@example.com", password: "HashedPassword123!"
         }).returning();
         managerUser = manager;
         const [managerInt] = await db.insert(internal_users).values({
-            userId: manager.id, internalRole: "Support Manager", department: "Oversight", isActive: true
+            userId: manager.id, department: "Oversight", isActive: true
         }).returning();
         await db.insert(support_managers).values({
-            internalUserId: managerInt.id, canAssign: true
+            internalUserId: managerInt.userId, canAssign: true
         });
-        managerToken = jwt.sign({ userID: manager.id, userROLE: "InternalUser" }, process.env.JWT_SECRET!);
+        managerToken = jwt.sign({ userID: manager.id, userROLE: "Support Manager" }, process.env.JWT_SECRET!);
 
         // 3. Create Technician
         const [tech] = await db.insert(users).values({
-            name: "Technician", email: "tech_test_incidents@example.com", password: "HashedPassword123!", role: "InternalUser"
+            name: "Technician", email: "tech_test_incidents@example.com", password: "HashedPassword123!"
         }).returning();
         techUser = tech;
         const [techInt] = await db.insert(internal_users).values({
-            userId: tech.id, internalRole: "Technician", department: "IT Support", isActive: true
+            userId: tech.id, department: "IT Support", isActive: true
         }).returning();
         const [techRec] = await db.insert(technicians).values({
-            internalUserId: techInt.id, specialty: "GPS Tracking", isAvailable: true
+            internalUserId: techInt.userId, specialty: "GPS Tracking", isAvailable: true
         }).returning();
         techRecord = techRec;
-        techToken = jwt.sign({ userID: tech.id, userROLE: "InternalUser" }, process.env.JWT_SECRET!);
+        techToken = jwt.sign({ userID: tech.id, userROLE: "Technician" }, process.env.JWT_SECRET!);
 
         // 4. Create Inactive Technician
         const [inactive] = await db.insert(users).values({
-            name: "Inactive Tech", email: "inactive_test_incidents@example.com", password: "HashedPassword123!", role: "InternalUser"
+            name: "Inactive Tech", email: "inactive_test_incidents@example.com", password: "HashedPassword123!"
         }).returning();
         inactiveUser = inactive;
-        await db.insert(internal_users).values({
-            userId: inactive.id, internalRole: "Technician", department: "IT Support", isActive: false
+        const [inactiveInt] = await db.insert(internal_users).values({
+            userId: inactive.id, department: "IT Support", isActive: false
+        }).returning();
+        await db.insert(technicians).values({
+            internalUserId: inactiveInt.userId, specialty: "GPS Tracking", isAvailable: true
         });
-        inactiveToken = jwt.sign({ userID: inactive.id, userROLE: "InternalUser" }, process.env.JWT_SECRET!);
+        inactiveToken = jwt.sign({ userID: inactive.id, userROLE: "Technician" }, process.env.JWT_SECRET!);
 
         // 5. Create Clients
         const [client1] = await db.insert(users).values({
-            name: "Client 1", email: "client1_test_incidents@example.com", password: "HashedPassword123!", role: "ClientUser"
+            name: "Client 1", email: "client1_test_incidents@example.com", password: "HashedPassword123!"
         }).returning();
         clientUser1 = client1;
         const [profile1] = await db.insert(clients).values({
@@ -82,7 +85,7 @@ describe("Incidents API Endpoints", () => {
         clientToken1 = jwt.sign({ userID: client1.id, userROLE: "ClientUser" }, process.env.JWT_SECRET!);
 
         const [client2] = await db.insert(users).values({
-            name: "Client 2", email: "client2_test_incidents@example.com", password: "HashedPassword123!", role: "ClientUser"
+            name: "Client 2", email: "client2_test_incidents@example.com", password: "HashedPassword123!"
         }).returning();
         clientUser2 = client2;
         const [profile2] = await db.insert(clients).values({
@@ -92,12 +95,12 @@ describe("Incidents API Endpoints", () => {
 
         // 6. Create Vehicles
         const [v1] = await db.insert(vehicles).values({
-            name: "Van 1", imei: "IMEI-I1", licensePlate: "PLATE-I1", clientId: clientProfile1.id
+            name: "Van 1", imei: "IMEI-I1", licensePlate: "PLATE-I1", clientId: clientProfile1.userId
         }).returning();
         vehicle1 = v1;
 
         const [v2] = await db.insert(vehicles).values({
-            name: "Van 2", imei: "IMEI-I2", licensePlate: "PLATE-I2", clientId: clientProfile2.id
+            name: "Van 2", imei: "IMEI-I2", licensePlate: "PLATE-I2", clientId: clientProfile2.userId
         }).returning();
         vehicle2 = v2;
     });
@@ -167,7 +170,7 @@ describe("Incidents API Endpoints", () => {
         expect(res.status).toBe(200);
         expect(data.length).toBeGreaterThan(0);
         data.forEach((inc: { clientId: number }) => {
-            expect(inc.clientId).toBe(clientProfile1!.id);
+            expect(inc.clientId).toBe(clientProfile1!.userId);
         });
     });
 
@@ -176,8 +179,9 @@ describe("Incidents API Endpoints", () => {
             method: "PATCH",
             headers: { "Authorization": `Bearer ${managerToken}` },
             body: JSON.stringify({
-                assignedToId: techRecord!.id,
-                status: "Open"
+                assignedToId: techRecord!.internalUserId,
+                status: "Open",
+                message: "Assigning technician"
             })
         });
 
@@ -185,7 +189,7 @@ describe("Incidents API Endpoints", () => {
         const data = await res.json();
 
         expect(res.status).toBe(200);
-        expect(data.assignedToId).toBe(techRecord!.id);
+        expect(data.assignedToId).toBe(techRecord!.internalUserId);
         expect(data.status).toBe("Open");
     });
 
@@ -194,7 +198,8 @@ describe("Incidents API Endpoints", () => {
             method: "PATCH",
             headers: { "Authorization": `Bearer ${techToken}` },
             body: JSON.stringify({
-                status: "Closed"
+                status: "Closed",
+                message: "Trying to close"
             })
         });
 
@@ -207,7 +212,8 @@ describe("Incidents API Endpoints", () => {
             method: "PATCH",
             headers: { "Authorization": `Bearer ${techToken}` },
             body: JSON.stringify({
-                status: "In Progress"
+                status: "In Progress",
+                message: "Tech starting work"
             })
         });
 
@@ -223,7 +229,8 @@ describe("Incidents API Endpoints", () => {
             method: "PATCH",
             headers: { "Authorization": `Bearer ${inactiveToken}` },
             body: JSON.stringify({
-                status: "Resolved"
+                status: "Resolved",
+                message: "Inactive test"
             })
         });
 
@@ -236,7 +243,8 @@ describe("Incidents API Endpoints", () => {
             method: "PATCH",
             headers: { "Authorization": `Bearer ${adminToken}` },
             body: JSON.stringify({
-                status: "Resolved"
+                status: "Resolved",
+                message: "Resolving incident"
             })
         });
 

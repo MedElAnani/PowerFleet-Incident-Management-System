@@ -61,7 +61,7 @@ export async function POST(req: Request) {
         
         // 4. Data persistence layer using Drizzle query builder syntax
         // .returning() forces Postgres to send back only the fields we declare, keeping hashes private
-        const [newUser] = await db
+                const [newUser] = await db
             .insert(users)
             .values({
                 email: trimmedEmail,
@@ -72,7 +72,6 @@ export async function POST(req: Request) {
                 id: users.id,
                 name: users.name,
                 email: users.email,
-                role: users.role,
                 createdAt: users.createdAt
             })
         
@@ -86,7 +85,7 @@ export async function POST(req: Request) {
         
         // 5. Success Response
         return NextResponse.json(
-            { success: true, data: newUser },
+            { success: true, data: { ...newUser, role: "ClientUser" } },
             { status: 201 }
         )
     } catch (err: unknown) {

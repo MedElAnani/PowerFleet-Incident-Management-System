@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth";
-import { updateComment } from "@/lib/services/comments";
+import { CommentService } from "@/lib/services/comment.service";
 
 export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string, commentId: string }> }) => {
     try {
@@ -39,7 +39,7 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { pa
             );
         }
         
-        const upComment = await updateComment(visibility, {
+        const upComment = await CommentService.updateComment(visibility, {
             userId: currentUser.userId,
             role: currentUser.role as "ClientUser" | "InternalUser"
         }, incidentId, targetCommentId);

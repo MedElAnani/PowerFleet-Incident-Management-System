@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth";
-import { createIncident, getIncidents } from "../../../lib/services/incidents";
+import { IncidentService } from "@/lib/services/incident.service";
 
 export const GET = withAuth(async (req: AuthenticatedRequest) => {
     try {
         const currentUser = req.user!;
 
-        const data = await getIncidents({
+        const data = await IncidentService.getIncidents({
             userId: currentUser.userId,
             role: currentUser.role as "ClientUser" | "InternalUser",
         });
@@ -27,7 +27,7 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
         const currentUser = req.user!;
         const body = await req.json();
 
-        const newIncident = await createIncident(body, currentUser.userId);
+        const newIncident = await IncidentService.createTicket(body, currentUser.userId);
 
         return NextResponse.json(newIncident, { status: 201 });
     } catch (error: unknown) {

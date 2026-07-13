@@ -3,7 +3,7 @@ import { withAuth, AuthenticatedRequest } from "@/middleware/auth";
 import { db } from "@/db"
 import { incidents, clients, internal_users, technicians } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { updateIncident } from "@/lib/services/incidents";
+import { IncidentService } from "@/lib/services/incident.service";
 
 export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { params: { id: string } }) => {
     try {
@@ -19,6 +19,7 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         }
         
         // Find the incident by ID with comments and their authors
+        const { resolveUserRole } = await import("@/lib/services/role");
         const incident = await db.query.incidents.findFirst({
             where: eq(incidents.id, incidentId),
             with: {
@@ -29,7 +30,9 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
                                 id: true,
                                 name: true,
                                 email: true,
-                                role: true,
+                            },
+                            with: {
+                                clientProfile: true
                             }
                         }
                     }
@@ -50,7 +53,7 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
                 where: eq(clients.userId, currentUser.userId),
             });
             
-            if (!clientRecord || incident.clientId !== clientRecord.id) {
+            if (!clientRecord || incident.clientId !== clientRecord.userId) {
                 return NextResponse.json(
                     { error: "Forbidden: You cannot access this incident!" }, 
                     { status: 403 }
@@ -58,16 +61,14 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
             }
         }
         
-        const internalUserRecord = await db.query.internal_users.findFirst({
-            where: eq(internal_users.userId, currentUser.userId)
-        })
+        const resolvedRole = await resolveUserRole(currentUser.userId);
         
-        if(internalUserRecord?.internalRole === "Technician"){
+        if(resolvedRole === "Technician"){
             const techRecord = await db.query.technicians.findFirst({
-                where: eq(technicians.internalUserId, internalUserRecord.id)
+                where: eq(technicians.internalUserId, currentUser.userId)
             })
             
-            if(techRecord?.id !== incident.assignedToId){
+            if(techRecord?.internalUserId !== incident.assignedToId){
                 return NextResponse.json(
                     { error: "Forbidden: You cannot access this incident!" }, 
                     { status: 403 }
@@ -76,8 +77,8 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         }
 
         // Apply visibility rules to filter comments
-        const isTech = internalUserRecord?.internalRole === "Technician";
-        const isStaff = internalUserRecord?.internalRole === "Admin" || internalUserRecord?.internalRole === "Support Manager";
+        const isTech = resolvedRole === "Technician";
+        const isStaff = resolvedRole === "Admin" || resolvedRole === "Support Manager";
 
         const filteredComments = incident.comments.filter(comment => {
             if (comment.visibility === "Public") return true;
@@ -85,7 +86,7 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
             if (isStaff) return true;
             if (isTech) {
                 // Technicians can see all internal/private notes, but not private comments written by Clients
-                return comment.user.role !== "ClientUser";
+                return !comment.user.clientProfile;
             }
             return false;
         });
@@ -127,7 +128,7 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { pa
             return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
         }
         
-        const newUpdatedIncident = await updateIncident(body, currentUser.userId, currentUser.role, incidentId);
+        const newUpdatedIncident = await IncidentService.updateIncident(body, currentUser.userId, incidentId);
         
         return NextResponse.json(
             newUpdatedIncident,
