@@ -4,6 +4,7 @@ import { users } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
+import { resolveUserRole } from "@/lib/services/role"
 
 export async function POST(req: Request) {
     try{
@@ -39,29 +40,37 @@ export async function POST(req: Request) {
                 { status: 401 }
             )
         }
+
+        // 4. Resolve Dynamic Role (for user response profile payload only)
+        const role = await resolveUserRole(user.id);
+        if(!role) {
+            return NextResponse.json(
+                { success: false, error: "Access Denied: User type could not be resolved." },
+                { status: 403 }
+            );
+        }
         
-        // 4. Generate JWT
+        // 5. Generate JWT (using only userID)
         const token = jwt.sign(
             {
-                userID: user.id,
-                userROLE: user.role
+                userID: user.id
             },
             process.env.JWT_SECRET!,
             { expiresIn: "1d" }
         )
         
-        // 5. Create a Success Response
+        // 6. Create a Success Response
         const response = NextResponse.json(
             { success: true, message: "Authentication successful.", user: { 
                     id: user.id,
                     email: user.email,
-                    role: user.role,
+                    role: role,
                     token
                 } 
             }
         )
         
-        // 5. Append Secure HTTP-Only Cookie Flag
+        // 7. Append Secure HTTP-Only Cookie Flag
         response.cookies.set("auth_token", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",

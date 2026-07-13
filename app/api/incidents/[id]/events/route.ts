@@ -21,7 +21,6 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
                     columns: {
                         id: true,
                         name: true,
-                        role: true
                     }
                 }
             }

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth";
-import { getEventIncidents } from "../../../lib/services/events";
+import { EventService } from "@/lib/services/event.service";
 
 export const GET = withAuth(async (req: AuthenticatedRequest) => {
     try {
         const currentUser = req.user!;
 
-        const data = await getEventIncidents({
+        const data = await EventService.getEventIncidents({
             userId: currentUser.userId,
             role: currentUser.role as "ClientUser" | "InternalUser",
         });

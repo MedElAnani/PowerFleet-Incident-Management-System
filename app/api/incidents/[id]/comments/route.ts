@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth";
-import { createComment } from "@/lib/services/comments";
+import { CommentService } from "@/lib/services/comment.service";
 
 export const POST = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
     try {
@@ -23,7 +23,7 @@ export const POST = withAuth(async (req: AuthenticatedRequest, { params }: { par
             return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
         }
         
-        const newComment = await createComment(body, {
+        const newComment = await CommentService.createComment(body, {
             userId: currentUser.userId,
             role: currentUser.role as "ClientUser" | "InternalUser"
         }, incidentId);

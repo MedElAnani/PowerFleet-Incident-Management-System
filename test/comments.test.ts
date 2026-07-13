@@ -10,9 +10,9 @@ import { eq } from "drizzle-orm";
 
 describe("Comments API & Visibility Endpoints", () => {
     let adminUser: { id: number } | undefined, adminToken: string;
-    let techUser1: { id: number } | undefined, techRecord1: { id: number } | undefined, techToken1: string;
+    let techUser1: { id: number } | undefined, techRecord1: { internalUserId: number } | undefined, techToken1: string;
     let techUser2: { id: number } | undefined, techToken2: string;
-    let clientUser: { id: number } | undefined, clientProfile: { id: number } | undefined, clientToken: string;
+    let clientUser: { id: number } | undefined, clientProfile: { userId: number } | undefined, clientToken: string;
 
     let vehicle: { id: number } | undefined;
     let incident: { id: number } | undefined;
@@ -21,20 +21,20 @@ describe("Comments API & Visibility Endpoints", () => {
     beforeAll(async () => {
         // 1. Create Admin
         const [admin] = await db.insert(users).values({
-            name: "Admin", email: "admin_test_comments@example.com", password: "HashedPassword123!", role: "InternalUser"
+            name: "Admin", email: "admin_test_comments@example.com", password: "HashedPassword123!"
         }).returning();
         adminUser = admin;
         const [adminInt] = await db.insert(internal_users).values({
-            userId: admin.id, internalRole: "Admin", department: "Oversight", isActive: true
+            userId: admin.id, department: "Oversight", isActive: true
         }).returning();
         await db.insert(admins).values({
-            internalUserId: adminInt.id, canManageUsers: true
+            internalUserId: adminInt.userId, canManageUsers: true
         });
-        adminToken = jwt.sign({ userID: admin.id, userROLE: "InternalUser" }, process.env.JWT_SECRET!);
+        adminToken = jwt.sign({ userID: admin.id, userROLE: "Admin" }, process.env.JWT_SECRET!);
 
         // 2. Create Client
         const [client] = await db.insert(users).values({
-            name: "Client", email: "client_test_comments@example.com", password: "HashedPassword123!", role: "ClientUser"
+            name: "Client", email: "client_test_comments@example.com", password: "HashedPassword123!"
         }).returning();
         clientUser = client;
         const [profile] = await db.insert(clients).values({
@@ -45,34 +45,34 @@ describe("Comments API & Visibility Endpoints", () => {
 
         // 3. Create Tech 1 (Assigned Tech)
         const [tech1] = await db.insert(users).values({
-            name: "Tech 1", email: "tech1_test_comments@example.com", password: "HashedPassword123!", role: "InternalUser"
+            name: "Tech 1", email: "tech1_test_comments@example.com", password: "HashedPassword123!"
         }).returning();
         techUser1 = tech1;
         const [techInt1] = await db.insert(internal_users).values({
-            userId: tech1.id, internalRole: "Technician", department: "IT Support", isActive: true
+            userId: tech1.id, department: "IT Support", isActive: true
         }).returning();
         const [techRec1] = await db.insert(technicians).values({
-            internalUserId: techInt1.id, specialty: "GPS Tracking", isAvailable: true
+            internalUserId: techInt1.userId, specialty: "GPS Tracking", isAvailable: true
         }).returning();
         techRecord1 = techRec1;
-        techToken1 = jwt.sign({ userID: tech1.id, userROLE: "InternalUser" }, process.env.JWT_SECRET!);
+        techToken1 = jwt.sign({ userID: tech1.id, userROLE: "Technician" }, process.env.JWT_SECRET!);
 
         // 4. Create Tech 2 (Unassigned Tech)
         const [tech2] = await db.insert(users).values({
-            name: "Tech 2", email: "tech2_test_comments@example.com", password: "HashedPassword123!", role: "InternalUser"
+            name: "Tech 2", email: "tech2_test_comments@example.com", password: "HashedPassword123!"
         }).returning();
         techUser2 = tech2;
         const [techInt2] = await db.insert(internal_users).values({
-            userId: tech2.id, internalRole: "Technician", department: "IT Support", isActive: true
+            userId: tech2.id, department: "IT Support", isActive: true
         }).returning();
         await db.insert(technicians).values({
-            internalUserId: techInt2.id, specialty: "GPS Tracking", isAvailable: true
+            internalUserId: techInt2.userId, specialty: "GPS Tracking", isAvailable: true
         });
-        techToken2 = jwt.sign({ userID: tech2.id, userROLE: "InternalUser" }, process.env.JWT_SECRET!);
+        techToken2 = jwt.sign({ userID: tech2.id, userROLE: "Technician" }, process.env.JWT_SECRET!);
 
         // 5. Create Vehicle
         const [v] = await db.insert(vehicles).values({
-            name: "Van", imei: "IMEI-C1", licensePlate: "PLATE-C1", clientId: clientProfile!.id
+            name: "Van", imei: "IMEI-C1", licensePlate: "PLATE-C1", clientId: clientProfile!.userId
         }).returning();
         vehicle = v;
 
@@ -83,9 +83,9 @@ describe("Comments API & Visibility Endpoints", () => {
             type: "GPS Device",
             address: "123 Test St",
             vehicleId: vehicle!.id,
-            clientId: clientProfile!.id,
+            clientId: clientProfile!.userId,
             reportedById: clientUser!.id,
-            assignedToId: techRecord1!.id,
+            assignedToId: techRecord1!.internalUserId,
             status: "Open"
         }).returning();
         incident = inc;
