@@ -111,7 +111,7 @@ export class CommentService {
 
             if (user.role !== "ClientUser" && !incidentExistence.firstResponseAt) {
                 const firstResponseAt = new Date();
-                const slaLimits = SlaService.getSlaLimits(incidentExistence.priority as any);
+                const slaLimits = SlaService.getSlaLimits(incidentExistence.priority);
                 const resolutionDueAt = new Date(firstResponseAt.getTime() + slaLimits.resolutionMs);
                 await db
                     .update(incidents)

@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { incidents, clients, vehicles, internal_users, technicians, support_managers, admins, users } from "@/db/schema";
+import { incidents, clients, vehicles, internal_users, technicians, support_managers, users } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { auditLogChanges } from "./audit";
 import { resolveUserRole } from "./role";
@@ -271,7 +271,7 @@ export class IncidentService {
         let resolutionDueAt = incident.resolutionDueAt;
         if (!firstResponseAt) {
             firstResponseAt = new Date();
-            const slaLimits = SlaService.getSlaLimits(incident.priority as any);
+            const slaLimits = SlaService.getSlaLimits(incident.priority);
             resolutionDueAt = new Date(firstResponseAt.getTime() + slaLimits.resolutionMs);
         }
 
@@ -359,7 +359,7 @@ export class IncidentService {
         let resolutionDueAt = incident.resolutionDueAt;
         if (!firstResponseAt) {
             firstResponseAt = new Date();
-            const slaLimits = SlaService.getSlaLimits(incident.priority as any);
+            const slaLimits = SlaService.getSlaLimits(incident.priority);
             resolutionDueAt = new Date(firstResponseAt.getTime() + slaLimits.resolutionMs);
         }
 
@@ -516,7 +516,7 @@ export class IncidentService {
             let resolutionDueAt = incident.resolutionDueAt;
             if (!firstResponseAt) {
                 firstResponseAt = new Date();
-                const slaLimits = SlaService.getSlaLimits(incident.priority as any);
+                const slaLimits = SlaService.getSlaLimits(incident.priority);
                 resolutionDueAt = new Date(firstResponseAt.getTime() + slaLimits.resolutionMs);
             }
 
@@ -609,7 +609,7 @@ export class IncidentService {
             const firstResponseTriggered = !firstResponseAt && (assignedToId !== undefined || (status !== undefined && status !== "New"));
             if (firstResponseTriggered) {
                 firstResponseAt = new Date();
-                const slaLimits = SlaService.getSlaLimits(activePriority as any);
+                const slaLimits = SlaService.getSlaLimits(activePriority);
                 resolutionDueAt = new Date(firstResponseAt.getTime() + slaLimits.resolutionMs);
             }
 

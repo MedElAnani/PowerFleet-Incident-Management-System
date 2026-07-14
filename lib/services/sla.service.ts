@@ -60,8 +60,13 @@ export class SlaService {
         const firstResponseTime = firstResponseAt ? new Date(firstResponseAt).getTime() : null;
         const resolvedTime = resolvedAt ? new Date(resolvedAt).getTime() : null;
         const currentTime = now.getTime();
-
-        let computedStatus = "Healthy";
+        
+        type SlaStatus = 
+            | "Healthy" | "Met" | "Met_With_Response_Breached" | "Met_With_Resolution_Breached" 
+            | "Breached_Both" | "Warning_Response" | "Warning_Resolution" | "Breached_Response" 
+            | "Breached_Resolution" ;
+            
+        let computedStatus: SlaStatus = "Healthy";
 
         if (resolvedTime !== null) {
             // Terminal States
@@ -161,7 +166,7 @@ export class SlaService {
         if (incident.slaStatus !== computedStatus) {
             await db
                 .update(incidents)
-                .set({ slaStatus: computedStatus as any })
+                .set({ slaStatus: computedStatus })
                 .where(eq(incidents.id, incidentId));
         }
 
