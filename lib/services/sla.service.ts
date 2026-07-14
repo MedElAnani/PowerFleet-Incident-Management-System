@@ -12,22 +12,79 @@ function createStatusError(message: string, status: number): StatusError {
     return error;
 }
 
+export type SlaPriority = "Low" | "Medium" | "High" | "Critical";
+
+interface SlaDuration {
+    responseHours: number;
+    resolutionHours: number;
+    responseWarningMs: number;
+    resolutionWarningMs: number;
+}
+
+export const SLA_CONFIG: Record<SlaPriority, SlaDuration> = {
+    Low: {
+        responseHours: 12,
+        resolutionHours: 24,
+        responseWarningMs: 15 * 60 * 1000,
+        resolutionWarningMs: 15 * 60 * 1000
+    },
+    Medium: {
+        responseHours: 6,
+        resolutionHours: 12,
+        responseWarningMs: 30 * 60 * 1000,
+        resolutionWarningMs: 30 * 60 * 1000
+    },
+    High: {
+        responseHours: 2,
+        resolutionHours: 6,
+        responseWarningMs: 90 * 60 * 1000,
+        resolutionWarningMs: 60 * 60 * 1000
+    },
+    Critical: {
+        responseHours: 0.5,
+        resolutionHours: 3,
+        responseWarningMs: 120 * 60 * 1000,
+        resolutionWarningMs: 90 * 60 * 1000
+    }
+};
+
 export class SlaService {
     /**
-     * Helper to retrieve Response & Resolution limits in milliseconds based on priority.
+     * Computes initial Response Due and Baseline Resolution Due on ticket creation.
      */
-    static getSlaLimits(priority: "Low" | "Medium" | "High" | "Critical"): { responseMs: number; resolutionMs: number } {
-        const LIMITS = {
-            Low: { responseHours: 12, resolutionHours: 24 },
-            Medium: { responseHours: 6, resolutionHours: 12 },
-            High: { responseHours: 2, resolutionHours: 6 },
-            Critical: { responseHours: 0.5, resolutionHours: 3 }
-        };
-        const duration = LIMITS[priority] || LIMITS.Medium;
-        return {
-            responseMs: duration.responseHours * 60 * 60 * 1000,
-            resolutionMs: duration.resolutionHours * 60 * 60 * 1000
-        };
+    static calculateCreationDates(priority: SlaPriority, createdAt: Date = new Date()) {
+        const config = SLA_CONFIG[priority];
+        const baseTime = createdAt.getTime();
+        const responseDueAt = new Date(baseTime + config.responseHours * 60 * 60 * 1000);
+        const resolutionDueAt = new Date(baseTime + (config.responseHours + config.resolutionHours) * 60 * 60 * 1000);
+        return { responseDueAt, resolutionDueAt };
+    }
+
+    /**
+     * Computes Resolution Due relative to the actual First Response timestamp.
+     */
+    static calculateFirstResponseDates(priority: SlaPriority, firstResponseAt: Date = new Date()) {
+        const config = SLA_CONFIG[priority];
+        const resolutionDueAt = new Date(firstResponseAt.getTime() + config.resolutionHours * 60 * 60 * 1000);
+        return { firstResponseAt, resolutionDueAt };
+    }
+
+    /**
+     * Recalculates Response Due and Resolution Due dates on priority transition.
+     */
+    static calculatePriorityChangeDates(priority: SlaPriority, createdAt: Date, firstResponseAt: Date | null) {
+        const config = SLA_CONFIG[priority];
+        const baseTime = createdAt.getTime();
+        const responseDueAt = new Date(baseTime + config.responseHours * 60 * 60 * 1000);
+        
+        let resolutionDueAt: Date;
+        if (firstResponseAt) {
+            resolutionDueAt = new Date(firstResponseAt.getTime() + config.resolutionHours * 60 * 60 * 1000);
+        } else {
+            resolutionDueAt = new Date(baseTime + (config.responseHours + config.resolutionHours) * 60 * 60 * 1000);
+        }
+
+        return { responseDueAt, resolutionDueAt };
     }
 
     /**
@@ -96,21 +153,7 @@ export class SlaService {
                     }
                 } else {
                     // Warning limits for Response
-                    let threshold = 0;
-                    switch (priority) {
-                        case "Low":
-                            threshold = 15 * 60 * 1000;
-                            break;
-                        case "Medium":
-                            threshold = 30 * 60 * 1000;
-                            break;
-                        case "High":
-                            threshold = 90 * 60 * 1000; // 1h 30m
-                            break;
-                        case "Critical":
-                            threshold = 120 * 60 * 1000; // 2h
-                            break;
-                    }
+                    const threshold = SLA_CONFIG[priority as SlaPriority].responseWarningMs;
 
                     if (remainingResponse <= threshold) {
                         computedStatus = "Warning_Response";
@@ -128,21 +171,7 @@ export class SlaService {
                         computedStatus = "Breached_Resolution";
                     } else {
                         // Warning limits for Resolution
-                        let threshold = 0;
-                        switch (priority) {
-                            case "Low":
-                                threshold = 15 * 60 * 1000;
-                                break;
-                            case "Medium":
-                                threshold = 30 * 60 * 1000;
-                                break;
-                            case "High":
-                                threshold = 60 * 60 * 1000; // 1h
-                                break;
-                            case "Critical":
-                                threshold = 90 * 60 * 1000; // 1h 30m
-                                break;
-                        }
+                        const threshold = SLA_CONFIG[priority as SlaPriority].resolutionWarningMs;
 
                         if (remainingResolution <= threshold) {
                             computedStatus = "Warning_Resolution";

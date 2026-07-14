@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { users, clients, vehicles, incidents } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { SlaService } from "@/lib/services/sla.service";
+import { NextRequest } from "next/server";
+import { POST as triggerSlaCron } from "@/app/api/cron/sla/route";
 
 describe("SLA Calculation Service Logic", () => {
     let clientUser: { id: number } | undefined;
@@ -196,5 +198,40 @@ describe("SLA Calculation Service Logic", () => {
         });
 
         expect(ticket?.slaStatus).toBe("Breached_Response");
+    });
+
+    it("should reject cron route requests if CRON_SLA_SECRET is missing or wrong", async () => {
+        process.env.CRON_SLA_SECRET = "test_cron_secret_key";
+
+        const reqWrong = new NextRequest("http://localhost:3000/api/cron/sla", {
+            method: "POST",
+            headers: {
+                "x-cron-secret": "wrong_key"
+            }
+        });
+        const resWrong = await triggerSlaCron(reqWrong);
+        expect(resWrong.status).toBe(401);
+
+        const reqMissing = new NextRequest("http://localhost:3000/api/cron/sla", {
+            method: "POST"
+        });
+        const resMissing = await triggerSlaCron(reqMissing);
+        expect(resMissing.status).toBe(401);
+    });
+
+    it("should allow cron route requests with correct CRON_SLA_SECRET", async () => {
+        process.env.CRON_SLA_SECRET = "test_cron_secret_key";
+
+        const req = new NextRequest("http://localhost:3000/api/cron/sla", {
+            method: "POST",
+            headers: {
+                "x-cron-secret": "test_cron_secret_key"
+            }
+        });
+
+        const res = await triggerSlaCron(req);
+        expect(res.status).toBe(200);
+        const data = await res.json();
+        expect(data.success).toBe(true);
     });
 });

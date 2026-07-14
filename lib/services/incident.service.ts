@@ -118,7 +118,7 @@ export class IncidentService {
         }
 
         const baseTime = Date.now();
-        const slaLimits = SlaService.getSlaLimits("Medium");
+        const { responseDueAt, resolutionDueAt } = SlaService.calculateCreationDates("Medium", new Date(baseTime));
 
         const [newIncident] = await db.insert(incidents).values({
             title,
@@ -130,8 +130,8 @@ export class IncidentService {
             longitude,
             clientId: clientRecord.userId,
             reportedById: authenticatedUserId,
-            responseDueAt: new Date(baseTime + slaLimits.responseMs),
-            resolutionDueAt: new Date(baseTime + slaLimits.responseMs + slaLimits.resolutionMs),
+            responseDueAt,
+            resolutionDueAt,
             slaStatus: "Healthy"
         }).returning();
         
@@ -270,9 +270,12 @@ export class IncidentService {
         let firstResponseAt = incident.firstResponseAt;
         let resolutionDueAt = incident.resolutionDueAt;
         if (!firstResponseAt) {
-            firstResponseAt = new Date();
-            const slaLimits = SlaService.getSlaLimits(incident.priority);
-            resolutionDueAt = new Date(firstResponseAt.getTime() + slaLimits.resolutionMs);
+            const calculated = SlaService.calculateFirstResponseDates(
+                incident.priority as any,
+                new Date()
+            );
+            firstResponseAt = calculated.firstResponseAt;
+            resolutionDueAt = calculated.resolutionDueAt;
         }
 
         const [updatedIncident] = await db
@@ -358,9 +361,12 @@ export class IncidentService {
         let firstResponseAt = incident.firstResponseAt;
         let resolutionDueAt = incident.resolutionDueAt;
         if (!firstResponseAt) {
-            firstResponseAt = new Date();
-            const slaLimits = SlaService.getSlaLimits(incident.priority);
-            resolutionDueAt = new Date(firstResponseAt.getTime() + slaLimits.resolutionMs);
+            const calculated = SlaService.calculateFirstResponseDates(
+                incident.priority as any,
+                new Date()
+            );
+            firstResponseAt = calculated.firstResponseAt;
+            resolutionDueAt = calculated.resolutionDueAt;
         }
 
         const [updatedIncident] = await db
@@ -515,9 +521,12 @@ export class IncidentService {
             let firstResponseAt = incident.firstResponseAt;
             let resolutionDueAt = incident.resolutionDueAt;
             if (!firstResponseAt) {
-                firstResponseAt = new Date();
-                const slaLimits = SlaService.getSlaLimits(incident.priority);
-                resolutionDueAt = new Date(firstResponseAt.getTime() + slaLimits.resolutionMs);
+                const calculated = SlaService.calculateFirstResponseDates(
+                    incident.priority as any,
+                    new Date()
+                );
+                firstResponseAt = calculated.firstResponseAt;
+                resolutionDueAt = calculated.resolutionDueAt;
             }
 
             const [updatedIncident] = await db
@@ -594,23 +603,24 @@ export class IncidentService {
             const activePriority = priority !== undefined ? priority : incident.priority;
 
             if (priority !== undefined && priority !== incident.priority) {
-                const baseTime = incident.createdAt ? new Date(incident.createdAt).getTime() : Date.now();
-                const slaLimits = SlaService.getSlaLimits(priority);
-                responseDueAt = new Date(baseTime + slaLimits.responseMs);
-
-                if (firstResponseAt) {
-                    const firstResponseTime = new Date(firstResponseAt).getTime();
-                    resolutionDueAt = new Date(firstResponseTime + slaLimits.resolutionMs);
-                } else {
-                    resolutionDueAt = new Date(baseTime + slaLimits.responseMs + slaLimits.resolutionMs);
-                }
+                const baseTime = incident.createdAt ? new Date(incident.createdAt) : new Date();
+                const calculated = SlaService.calculatePriorityChangeDates(
+                    priority,
+                    baseTime,
+                    firstResponseAt
+                );
+                responseDueAt = calculated.responseDueAt;
+                resolutionDueAt = calculated.resolutionDueAt;
             }
 
             const firstResponseTriggered = !firstResponseAt && (assignedToId !== undefined || (status !== undefined && status !== "New"));
             if (firstResponseTriggered) {
-                firstResponseAt = new Date();
-                const slaLimits = SlaService.getSlaLimits(activePriority);
-                resolutionDueAt = new Date(firstResponseAt.getTime() + slaLimits.resolutionMs);
+                const calculated = SlaService.calculateFirstResponseDates(
+                    activePriority as any,
+                    new Date()
+                );
+                firstResponseAt = calculated.firstResponseAt;
+                resolutionDueAt = calculated.resolutionDueAt;
             }
 
             const [updatedIncident] = await db

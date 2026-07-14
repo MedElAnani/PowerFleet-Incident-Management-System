@@ -110,9 +110,9 @@ export class CommentService {
             });
 
             if (user.role !== "ClientUser" && !incidentExistence.firstResponseAt) {
-                const firstResponseAt = new Date();
-                const slaLimits = SlaService.getSlaLimits(incidentExistence.priority);
-                const resolutionDueAt = new Date(firstResponseAt.getTime() + slaLimits.resolutionMs);
+                const { firstResponseAt, resolutionDueAt } = SlaService.calculateFirstResponseDates(
+                    incidentExistence.priority as any
+                );
                 await db
                     .update(incidents)
                     .set({
