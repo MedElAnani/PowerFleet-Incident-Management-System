@@ -59,6 +59,16 @@ export async function auditLogChanges(config: {
             newValue: null,
             message: `User ${userId} comment on incident ${incidentId}`,
             });
+    }else if(logType === 'attachment') {
+        const eventType = 'add_attachment'
+        eventsToLog.push({
+            incidentId,
+            userId,
+            eventType,
+            oldValue: null,
+            newValue: null,
+            message: `User ${userId} add an attachment on incident ${incidentId}`,
+            });
     }
 
     if (eventsToLog.length > 0) {
