@@ -12,6 +12,7 @@ export const eventTypeEnum = pgEnum("event_type_enum", [
     "status_changed",
     "priority_changed",
     "technician_assigned",
+    "add_attachment"
 ]);
 export const impactLevelEnum = pgEnum("impact_level", ["Low", "Medium", "High", "Critical"])
 export const relationshipEnum = pgEnum("impact_relationship", ["Primary", "Secondary", "Dependent"])

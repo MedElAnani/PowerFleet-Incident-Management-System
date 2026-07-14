@@ -55,7 +55,7 @@ export class CommentService {
         await this.checkUserNotDeleted(user.userId);
         
         const incidentExistence = await db.query.incidents.findFirst({
-            where: eq(incidents.id, incidentId)
+            where: and ( eq(incidents.id, incidentId), isNull(incidents.deletedAt) )
         });
         
         if (!incidentExistence) {
