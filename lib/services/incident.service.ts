@@ -3,7 +3,7 @@ import { incidents, clients, vehicles, internal_users, technicians, support_mana
 import { eq, and, isNull } from "drizzle-orm";
 import { auditLogChanges } from "./audit";
 import { resolveUserRole } from "./role";
-import { SlaService } from "./sla.service";
+import { SlaService, SlaPriority } from "./sla.service";
 
 interface StatusError extends Error {
     status?: number;
@@ -271,7 +271,7 @@ export class IncidentService {
         let resolutionDueAt = incident.resolutionDueAt;
         if (!firstResponseAt) {
             const calculated = SlaService.calculateFirstResponseDates(
-                incident.priority as any,
+                incident.priority as SlaPriority,
                 new Date()
             );
             firstResponseAt = calculated.firstResponseAt;
@@ -362,7 +362,7 @@ export class IncidentService {
         let resolutionDueAt = incident.resolutionDueAt;
         if (!firstResponseAt) {
             const calculated = SlaService.calculateFirstResponseDates(
-                incident.priority as any,
+                incident.priority as SlaPriority,
                 new Date()
             );
             firstResponseAt = calculated.firstResponseAt;
@@ -522,7 +522,7 @@ export class IncidentService {
             let resolutionDueAt = incident.resolutionDueAt;
             if (!firstResponseAt) {
                 const calculated = SlaService.calculateFirstResponseDates(
-                    incident.priority as any,
+                    incident.priority as SlaPriority,
                     new Date()
                 );
                 firstResponseAt = calculated.firstResponseAt;
@@ -616,7 +616,7 @@ export class IncidentService {
             const firstResponseTriggered = !firstResponseAt && (assignedToId !== undefined || (status !== undefined && status !== "New"));
             if (firstResponseTriggered) {
                 const calculated = SlaService.calculateFirstResponseDates(
-                    activePriority as any,
+                    activePriority as SlaPriority,
                     new Date()
                 );
                 firstResponseAt = calculated.firstResponseAt;
