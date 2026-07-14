@@ -1,6 +1,13 @@
 import { db } from "@/db";
 import { incident_events } from "@/db/schema";
 
+function stringifyValue(val: unknown): string {
+    if (val === null || val === undefined) return "None";
+    if (val instanceof Date) return val.toISOString();
+    if (typeof val === "object") return JSON.stringify(val);
+    return String(val);
+}
+
 function detectUpdateEvents(
     incidentId: number,
     userId: number,
@@ -26,9 +33,9 @@ function detectUpdateEvents(
                 incidentId,
                 userId,
                 eventType,
-                oldValue: oldValue !== null ? String(oldValue) : "None",
-                newValue: newValue !== null ? String(newValue) : "None",
-                message: message !== undefined && message !== null ? String(message) : "None",
+                oldValue: stringifyValue(oldValue),
+                newValue: stringifyValue(newValue),
+                message: stringifyValue(message),
             });
         }
     }

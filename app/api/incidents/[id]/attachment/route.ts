@@ -7,7 +7,7 @@ export const POST = withAuth(async (req: AuthenticatedRequest, { params }: { par
         const { id } = await params;
         const incidentId = Number(id);
         
-        if (isNaN(incidentId)) {
+        if (Number.isNaN(incidentId)) {
             return NextResponse.json(
                 { error: "Invalid incident ID" },
                 { status: 400 }
