@@ -15,6 +15,17 @@ export const eventTypeEnum = pgEnum("event_type_enum", [
 ]);
 export const impactLevelEnum = pgEnum("impact_level", ["Low", "Medium", "High", "Critical"])
 export const relationshipEnum = pgEnum("impact_relationship", ["Primary", "Secondary", "Dependent"])
+export const slaStatusEnum = pgEnum("incident_slaStatus_enum", [
+    "Healthy",
+    "Warning_Response",
+    "Warning_Resolution",
+    "Breached_Response",
+    "Breached_Resolution",
+    "Breached_Both",
+    "Met",
+    "Met_With_Response_Breached",
+    "Met_With_Resolution_Breached"
+]);
 
 // 1. User Table
 export const users = pgTable("users", {
@@ -102,7 +113,7 @@ export const incidents = pgTable("incidents", {
     resolvedAt: timestamp("resolved_at"),
     resolutionDueAt: timestamp("resolution_due_at"),
     firstResponseAt: timestamp("first_response_at"),
-    slaStatus: text("sla_status"),
+    slaStatus: slaStatusEnum("sla_status").default("Healthy"),
     closedAt: timestamp("closed_at"),
     resolutionNote: text("resolution_note"),
     createdAt: timestamp('created_at').defaultNow(),

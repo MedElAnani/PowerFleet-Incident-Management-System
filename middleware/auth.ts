@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
-import { db } from "@/db"
-import { admins, support_managers, technicians, clients, internal_users } from "@/db/schema"
-import { eq } from "drizzle-orm"
 import { resolveUserRole } from "@/lib/services/role"
 
 export interface AuthenticatedRequest extends Request {
@@ -12,11 +9,9 @@ export interface AuthenticatedRequest extends Request {
     }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type NextRouteHandler = (request: AuthenticatedRequest, ...args: any[]) => Promise<Response> | Response;
 
 export function withAuth(handler: NextRouteHandler, requiredType?: "Admin" | "Support Manager" | "Technician" | "ClientUser" | "InternalUser") {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return async (request: Request, ...args: any[]) => {
         try {
             // 1. Check For Authorization Header
