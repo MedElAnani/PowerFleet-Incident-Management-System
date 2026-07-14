@@ -113,6 +113,31 @@ Entity soft-deletion does not use redundant boolean columns. Instead, it relies 
 
 ---
 
+## SLA (Service Level Agreement) Engine
+
+The system features an automated Service Level Agreement (SLA) calculation engine. It evaluates tickets dynamically based on response and resolution milestone deadlines.
+
+### Due Date Offsets
+| Priority | Response SLA Limit (From Creation) | Resolution SLA Limit (From First Response) |
+| :--- | :--- | :--- |
+| **Low** | `createdAt + 12 hours` | `firstResponseAt + 24 hours` |
+| **Medium** | `createdAt + 6 hours` | `firstResponseAt + 12 hours` |
+| **High** | `createdAt + 2 hours` | `firstResponseAt + 6 hours` |
+| **Critical** | `createdAt + 30 minutes` | `firstResponseAt + 3 hours` |
+
+### SLA Status States
+1.  **Healthy:** Time remaining on pending milestone is above the warning thresholds.
+2.  **Warning_Response:** Response is pending with warning time remaining.
+3.  **Breached_Response:** Response deadline missed; resolution is still within limits.
+4.  **Warning_Resolution:** Response was met on time; resolution is pending with warning time remaining.
+5.  **Breached_Resolution:** Response was met on time; resolution deadline missed.
+6.  **Breached_Both:** Both response and resolution deadlines missed.
+7.  **Met:** Both response and resolution limits successfully met on time.
+8.  **Met_With_Response_Breached:** Response deadline missed, but resolution met on time.
+9.  **Met_With_Resolution_Breached:** Response met on time, but resolution deadline missed.
+
+---
+
 ## Role-Based Access Control
 
 *   **ClientUser:** Can register, create incidents, view/comment on own incidents, change own comments visibility.
@@ -143,6 +168,7 @@ Entity soft-deletion does not use redundant boolean columns. Instead, it relies 
 | PATCH  | `/api/incidents/:id/comments/:commentId` | Update visibility of a comment            | Any authenticated |
 | GET    | `/api/incidents/:id/events`              | Get incident history timeline events      | Any authenticated |
 | GET    | `/api/events`                            | List global system audit logs             | InternalUser      |
+| POST   | `/api/cron/sla`                          | Trigger periodic SLA checks on open tickets| System/Cron Runner|
 
 ### Vehicles
 
@@ -201,10 +227,10 @@ npm run dev
 ```
 powerfleet_ims/
 ├── app/                    # Next.js App Router & API Layer
-│   └── api/                # HTTP Endpoint Handlers (auth, events, incidents, vehicles)
+│   └── api/                # HTTP Endpoint Handlers (auth, cron, events, incidents, vehicles)
 ├── db/                     # Database & Schema Layer (schema, relations, index client)
 ├── lib/
-│   └── services/           # OOP Service & Business Logic Layer (incident, comment, vehicle, event services)
+│   └── services/           # OOP Service Layer (incident, comment, vehicle, event, and SLA services)
 ├── middleware/             # Request Interceptors (JWT Auth, RBAC)
 └── test/                   # Integration and Unit Test Suites (Vitest)
 ```

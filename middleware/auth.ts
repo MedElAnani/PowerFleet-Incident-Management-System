@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
-import { db } from "@/db"
-import { admins, support_managers, technicians, clients, internal_users } from "@/db/schema"
-import { eq } from "drizzle-orm"
 import { resolveUserRole } from "@/lib/services/role"
 
 export interface AuthenticatedRequest extends Request {

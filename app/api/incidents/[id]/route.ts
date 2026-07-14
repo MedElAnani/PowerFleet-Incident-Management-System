@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth"; 
 import { db } from "@/db"
-import { incidents, clients, internal_users, technicians } from "@/db/schema";
+import { incidents, clients, technicians } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { IncidentService } from "@/lib/services/incident.service";
 

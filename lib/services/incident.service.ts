@@ -1,8 +1,9 @@
 import { db } from "@/db";
-import { incidents, clients, vehicles, internal_users, technicians, support_managers, admins, users } from "@/db/schema";
+import { incidents, clients, vehicles, internal_users, technicians, support_managers, users } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { auditLogChanges } from "./audit";
 import { resolveUserRole } from "./role";
+import { SlaService, SlaPriority } from "./sla.service";
 
 interface StatusError extends Error {
     status?: number;
@@ -116,6 +117,9 @@ export class IncidentService {
             throw createStatusError("You can only report incidents for your own vehicles.", 403);
         }
 
+        const baseTime = Date.now();
+        const { responseDueAt, resolutionDueAt } = SlaService.calculateCreationDates("Medium", new Date(baseTime));
+
         const [newIncident] = await db.insert(incidents).values({
             title,
             description,
@@ -126,6 +130,9 @@ export class IncidentService {
             longitude,
             clientId: clientRecord.userId,
             reportedById: authenticatedUserId,
+            responseDueAt,
+            resolutionDueAt,
+            slaStatus: "Healthy"
         }).returning();
         
         const incidentId = newIncident.id;
@@ -137,9 +144,14 @@ export class IncidentService {
                 logType: 'create',
                 newRecord: newIncident
             });
+            await SlaService.calculateSLA(incidentId);
         }
 
-        return newIncident;
+        const refreshedIncident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        return refreshedIncident || newIncident;
     }
 
     /**
@@ -255,10 +267,23 @@ export class IncidentService {
             }
         }
 
+        let firstResponseAt = incident.firstResponseAt;
+        let resolutionDueAt = incident.resolutionDueAt;
+        if (!firstResponseAt) {
+            const calculated = SlaService.calculateFirstResponseDates(
+                incident.priority as SlaPriority,
+                new Date()
+            );
+            firstResponseAt = calculated.firstResponseAt;
+            resolutionDueAt = calculated.resolutionDueAt;
+        }
+
         const [updatedIncident] = await db
             .update(incidents)
             .set({
                 status: newStatus,
+                firstResponseAt,
+                resolutionDueAt,
                 ...(newStatus === "Resolved" && { resolvedAt: new Date() }),
                 updatedAt: new Date(),
             })
@@ -274,7 +299,13 @@ export class IncidentService {
             message
         });
 
-        return updatedIncident;
+        await SlaService.calculateSLA(incidentId);
+
+        const refreshedIncident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        return refreshedIncident || updatedIncident;
     }
 
     /**
@@ -327,10 +358,23 @@ export class IncidentService {
             throw createStatusError("Forbidden: Only Support Managers or Admins can assign incidents.", 403);
         }
 
+        let firstResponseAt = incident.firstResponseAt;
+        let resolutionDueAt = incident.resolutionDueAt;
+        if (!firstResponseAt) {
+            const calculated = SlaService.calculateFirstResponseDates(
+                incident.priority as SlaPriority,
+                new Date()
+            );
+            firstResponseAt = calculated.firstResponseAt;
+            resolutionDueAt = calculated.resolutionDueAt;
+        }
+
         const [updatedIncident] = await db
             .update(incidents)
             .set({
                 assignedToId: technicianUserId,
+                firstResponseAt,
+                resolutionDueAt,
                 updatedAt: new Date(),
             })
             .where(eq(incidents.id, incidentId))
@@ -345,7 +389,13 @@ export class IncidentService {
             message
         });
 
-        return updatedIncident;
+        await SlaService.calculateSLA(incidentId);
+
+        const refreshedIncident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        return refreshedIncident || updatedIncident;
     }
 
     /**
@@ -379,6 +429,7 @@ export class IncidentService {
             .set({
                 status: "Closed",
                 closedAt: new Date(),
+                ...(!incident.resolvedAt && { resolvedAt: new Date() }),
                 ...(resolutionNote !== undefined && { resolutionNote }),
                 updatedAt: new Date(),
             })
@@ -394,7 +445,13 @@ export class IncidentService {
             message
         });
 
-        return updatedIncident;
+        await SlaService.calculateSLA(incidentId);
+
+        const refreshedIncident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        return refreshedIncident || updatedIncident;
     }
 
     /**
@@ -461,10 +518,23 @@ export class IncidentService {
                 throw createStatusError("Message For This Action Is Required", 400);
             }
 
+            let firstResponseAt = incident.firstResponseAt;
+            let resolutionDueAt = incident.resolutionDueAt;
+            if (!firstResponseAt) {
+                const calculated = SlaService.calculateFirstResponseDates(
+                    incident.priority as SlaPriority,
+                    new Date()
+                );
+                firstResponseAt = calculated.firstResponseAt;
+                resolutionDueAt = calculated.resolutionDueAt;
+            }
+
             const [updatedIncident] = await db
                 .update(incidents)
                 .set({
                     ...(status !== undefined && { status }),
+                    firstResponseAt,
+                    resolutionDueAt,
                     ...(status === "Resolved" && { resolvedAt: new Date() }),
                     updatedAt: new Date(),
                 })
@@ -480,7 +550,13 @@ export class IncidentService {
                 message
             });
 
-            return updatedIncident;
+            await SlaService.calculateSLA(incidentId);
+
+            const refreshedIncident = await db.query.incidents.findFirst({
+                where: eq(incidents.id, incidentId)
+            });
+
+            return refreshedIncident || updatedIncident;
         }
 
         // ---- Admin & Support Manager: assign, priorities, status ----
@@ -520,14 +596,44 @@ export class IncidentService {
                 throw createStatusError("Message For This Action Is Required", 400);
             }
 
+            let responseDueAt = incident.responseDueAt;
+            let resolutionDueAt = incident.resolutionDueAt;
+            let firstResponseAt = incident.firstResponseAt;
+
+            const activePriority = priority !== undefined ? priority : incident.priority;
+
+            if (priority !== undefined && priority !== incident.priority) {
+                const baseTime = incident.createdAt ? new Date(incident.createdAt) : new Date();
+                const calculated = SlaService.calculatePriorityChangeDates(
+                    priority,
+                    baseTime,
+                    firstResponseAt
+                );
+                responseDueAt = calculated.responseDueAt;
+                resolutionDueAt = calculated.resolutionDueAt;
+            }
+
+            const firstResponseTriggered = !firstResponseAt && (assignedToId !== undefined || (status !== undefined && status !== "New"));
+            if (firstResponseTriggered) {
+                const calculated = SlaService.calculateFirstResponseDates(
+                    activePriority as SlaPriority,
+                    new Date()
+                );
+                firstResponseAt = calculated.firstResponseAt;
+                resolutionDueAt = calculated.resolutionDueAt;
+            }
+
             const [updatedIncident] = await db
                 .update(incidents)
                 .set({
                     ...(priority !== undefined && { priority }),
                     ...(status !== undefined && { status }),
                     ...(assignedToId !== undefined && { assignedToId }),
+                    responseDueAt,
+                    resolutionDueAt,
+                    firstResponseAt,
                     ...(status === "Resolved" && { resolvedAt: new Date() }),
-                    ...(status === "Closed" && { closedAt: new Date() }),
+                    ...(status === "Closed" && { closedAt: new Date(), ...(!incident.resolvedAt && { resolvedAt: new Date() }) }),
                     updatedAt: new Date(),
                 })
                 .where(eq(incidents.id, incidentId))
@@ -542,7 +648,13 @@ export class IncidentService {
                 message
             });
 
-            return updatedIncident;
+            await SlaService.calculateSLA(incidentId);
+
+            const refreshedIncident = await db.query.incidents.findFirst({
+                where: eq(incidents.id, incidentId)
+            });
+
+            return refreshedIncident || updatedIncident;
         }
 
         throw createStatusError("Forbidden: Unrecognized role.", 403);

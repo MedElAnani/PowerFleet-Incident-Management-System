@@ -2,6 +2,7 @@ import { db } from '@/db'
 import { internal_users, incidents, technicians, incident_comments, admins, users } from '@/db/schema'
 import { eq, and, isNull } from "drizzle-orm";
 import { auditLogChanges } from './audit';
+import { SlaService, SlaPriority } from './sla.service';
 
 type CommentVisibility = 
     | "Public" | "Private"
@@ -107,6 +108,22 @@ export class CommentService {
                 logType: 'comment',
                 newRecord: newComment
             });
+
+            if (user.role !== "ClientUser" && !incidentExistence.firstResponseAt) {
+                const { firstResponseAt, resolutionDueAt } = SlaService.calculateFirstResponseDates(
+                    incidentExistence.priority as SlaPriority
+                );
+                await db
+                    .update(incidents)
+                    .set({
+                        firstResponseAt,
+                        resolutionDueAt,
+                        updatedAt: new Date()
+                    })
+                    .where(eq(incidents.id, incidentId));
+            }
+
+            await SlaService.calculateSLA(incidentId);
         }
         
         return newComment;
