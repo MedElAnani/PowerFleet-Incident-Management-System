@@ -38,6 +38,37 @@ export class AttachmentService {
         return userRecord
     }
     
+    private static async validateUserPermissions(user: CurrentUser, incidentExistence: typeof incidents.$inferSelect) {
+        if (user.role === "ClientUser") {
+            if (user.userId !== incidentExistence.reportedById) {
+                throw createStatusError("Forbidden: You cannot add attachment to this incident!", 403);
+            }
+            return;
+        }
+
+        // Internal User Checks
+        const internalUserRecord = await db.query.internal_users.findFirst({
+            where: eq(internal_users.userId, user.userId)
+        });
+        
+        if (!internalUserRecord) {
+            throw createStatusError("Forbidden: You cannot add attachment to this incident!", 403);
+        }
+        
+        // Enforce the isActive check
+        if (!internalUserRecord.isActive) {
+            throw createStatusError("Forbidden: Your account is inactive.", 403);
+        }
+        
+        // Technician Checks
+        const techRecord = await db.query.technicians.findFirst({
+            where: eq(technicians.internalUserId, user.userId)
+        });
+        if (techRecord && techRecord.internalUserId !== incidentExistence.assignedToId) {
+            throw createStatusError("Forbidden: You cannot add attachment to this incident!", 403);
+        }
+    }
+    
     /**
      * Creates a attachment.
      */
@@ -60,35 +91,7 @@ export class AttachmentService {
         }
         
         // 2. Role-based Authorization Checks
-        if (user.role === "ClientUser") {
-            if (user.userId !== incidentExistence.reportedById) {
-                throw createStatusError("Forbidden: You cannot add attachment to this incident!", 403);
-            }
-        } else {
-            // Internal User Checks
-            const internalUserRecord = await db.query.internal_users.findFirst({
-                where: eq(internal_users.userId, user.userId)
-            });
-            
-            if (!internalUserRecord) {
-                throw createStatusError("Forbidden: You cannot add attachment to this incident!", 403);
-            }
-            
-            // Enforce the isActive check
-            if (!internalUserRecord.isActive) {
-                throw createStatusError("Forbidden: Your account is inactive.", 403);
-            }
-            
-            // Technician Checks
-            const techRecord = await db.query.technicians.findFirst({
-                where: eq(technicians.internalUserId, user.userId)
-            });
-            if (techRecord) {
-                if (techRecord.internalUserId !== incidentExistence.assignedToId) {
-                    throw createStatusError("Forbidden: You cannot add attachment to this incident!", 403);
-                }
-            }
-        }
+        await this.validateUserPermissions(user, incidentExistence);
         
         // 3. Single Database Insert
         const [newAttachment] = await db.insert(incident_attachments).values({
