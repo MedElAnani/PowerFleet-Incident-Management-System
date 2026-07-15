@@ -58,7 +58,7 @@ JWT Auth Middleware (middleware/auth.ts)
     │
     ▼
 Route Handlers (app/api/*/route.ts)
-    │  • Parse request body
+    │  • Parse request body & Zod validation
     │  • Delegate to OOP Service classes
     │  • Return JSON responses
     │
@@ -117,6 +117,10 @@ Entity soft-deletion does not use redundant boolean columns. Instead, it relies 
 
 The system features an automated Service Level Agreement (SLA) calculation engine. It evaluates tickets dynamically based on response and resolution milestone deadlines.
 
+### Milestone Triggers
+- **Response Deadline (`firstResponseAt`)**: Exclusively triggered when an internal staff member (`Admin`, `Support Manager`, or `Technician`) explicitly writes a comment on the ticket. Changes in status or ticket assignments *do not* artificially trigger response SLAs.
+- **Resolution Deadline (`resolvedAt`)**: Triggered when the incident status is moved to `Resolved`.
+
 ### Due Date Offsets
 | Priority | Response SLA Limit (From Creation) | Resolution SLA Limit (From First Response) |
 | :--- | :--- | :--- |
@@ -140,7 +144,7 @@ The system features an automated Service Level Agreement (SLA) calculation engin
 
 ## Role-Based Access Control
 
-*   **ClientUser:** Can register, create incidents, view/comment on own incidents, change own comments visibility.
+*   **ClientUser:** Can register, create incidents, view/comment on own incidents, change own comments visibility. Forbidden from filtering by internal metrics (e.g. `slaStatus`).
 *   **Technician:** Can view/comment on assigned incidents, change own comments visibility, resolve incidents.
 *   **SupportManager:** Can view all incidents, assign work, comment on any incident.
 *   **Admin:** Full access, manage vehicles & users, comment on any incident, change any comment visibility.
@@ -160,7 +164,7 @@ The system features an automated Service Level Agreement (SLA) calculation engin
 
 | Method | Endpoint                                 | Description                               | Role Required     |
 | ------ | ---------------------------------------- | ----------------------------------------- | ----------------- |
-| GET    | `/api/incidents`                         | List incidents (scoped by role visibility)| Any authenticated |
+| GET    | `/api/incidents`                         | List incidents (supports dynamic query filtering) | Any authenticated |
 | POST   | `/api/incidents`                         | Create an incident                        | ClientUser        |
 | GET    | `/api/incidents/:id`                     | Get incident by ID (includes comments)    | Any authenticated |
 | PATCH  | `/api/incidents/:id`                     | Update an incident                        | Any authenticated |
@@ -169,6 +173,15 @@ The system features an automated Service Level Agreement (SLA) calculation engin
 | GET    | `/api/incidents/:id/events`              | Get incident history timeline events      | Any authenticated |
 | GET    | `/api/events`                            | List global system audit logs             | InternalUser      |
 | POST   | `/api/cron/sla`                          | Trigger periodic SLA checks on open tickets| System/Cron Runner|
+
+#### Incident Query Filters (GET `/api/incidents`)
+Supports robust search queries dynamically built by Drizzle:
+- `?search=` (Matches `ID` exact or `Title` fuzzy)
+- `?status=Open,Resolved`
+- `?priority=High,Critical`
+- `?type=GPS Device,Vehicle`
+- `?slaStatus=Breached_Both,Warning_Response` (Internal Users only)
+- `?dateFrom=` & `?dateTo=` (ISO Strings)
 
 ### Vehicles
 
