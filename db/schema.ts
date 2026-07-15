@@ -217,3 +217,22 @@ export const impact_links = pgTable("impact_links", {
         .references(() => vehicles.id, { onDelete: "cascade" })
         .notNull()
 })
+
+// 15. Incident Internal Notes Table
+export const incident_internal_notes = pgTable('incident_internal_notes', {
+    id: serial('id').primaryKey(),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    priority: priorityEnum('priority').notNull(),
+    visibility: visibilityEnum('visibility').notNull().default('Public'),
+    isPinned: boolean('is_pinned').notNull().default(false),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).defaultNow(),
+    deletedAt: timestamp('deleted_at', { mode: 'date', withTimezone: true }),
+    incidentId: integer('incident_id')
+        .references(() => incidents.id, { onDelete: 'cascade' })
+        .notNull(),
+    authorId: integer('author_id')
+        .references(() => internal_users.userId, { onDelete: 'cascade' })
+        .notNull()
+})
