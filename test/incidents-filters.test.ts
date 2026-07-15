@@ -100,7 +100,7 @@ describe("Incident Filtering & Search API", () => {
         const allData = await res.json();
         
         expect(res.status).toBe(200);
-        const data = allData.filter((i: any) => createdIncidentIds.includes(i.id));
+        const data = allData.filter((i: { id: number; title: string }) => createdIncidentIds.includes(i.id));
         expect(data.length).toBe(1);
         expect(data[0].title).toBe("GPS offline completely");
     });
@@ -115,9 +115,9 @@ describe("Incident Filtering & Search API", () => {
         const allData = await res.json();
         
         expect(res.status).toBe(200);
-        const data = allData.filter((i: any) => createdIncidentIds.includes(i.id));
+        const data = allData.filter((i: { id: number; title: string }) => createdIncidentIds.includes(i.id));
         expect(data.length).toBe(2);
-        const titles = data.map((i: any) => i.title);
+        const titles = data.map((i: { id: number; title: string }) => i.title);
         expect(titles).toContain("GPS offline completely");
         expect(titles).toContain("Engine issue");
     });
@@ -135,7 +135,7 @@ describe("Incident Filtering & Search API", () => {
         
         expect(res.status).toBe(200);
         // Returns all 3 client tickets, successfully ignoring the forbidden filters
-        const data = allData.filter((i: any) => createdIncidentIds.includes(i.id));
+        const data = allData.filter((i: { id: number; title: string }) => createdIncidentIds.includes(i.id));
         expect(data.length).toBe(3);
     });
     
@@ -151,7 +151,7 @@ describe("Incident Filtering & Search API", () => {
         
         expect(res.status).toBe(200);
         // Tech should only see the 1 incident assigned to them
-        const data = allData.filter((i: any) => createdIncidentIds.includes(i.id));
+        const data = allData.filter((i: { id: number; title: string }) => createdIncidentIds.includes(i.id));
         expect(data.length).toBe(1);
         expect(data[0].title).toBe("Engine issue");
     });

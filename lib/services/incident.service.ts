@@ -608,9 +608,7 @@ export class IncidentService {
 
             let responseDueAt = incident.responseDueAt;
             let resolutionDueAt = incident.resolutionDueAt;
-            let firstResponseAt = incident.firstResponseAt;
-
-            const activePriority = priority !== undefined ? priority : incident.priority;
+            const firstResponseAt = incident.firstResponseAt;
 
             if (priority !== undefined && priority !== incident.priority) {
                 const baseTime = incident.createdAt ? new Date(incident.createdAt) : new Date();
