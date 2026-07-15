@@ -1,9 +1,10 @@
 import { db } from "@/db";
 import { incidents, clients, vehicles, internal_users, technicians, support_managers, users } from "@/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, ilike, inArray, gte, lte, SQL } from "drizzle-orm";
 import { auditLogChanges } from "./audit";
 import { resolveUserRole } from "./role";
 import { SlaService, SlaPriority } from "./sla.service";
+import { GetIncidentsFilters } from "./validations/incident";
 
 interface StatusError extends Error {
     status?: number;
@@ -155,9 +156,47 @@ export class IncidentService {
     }
 
     /**
+     * Helper to build dynamic Drizzle WHERE clauses based on filters
+     */
+    private static buildIncidentFilters(filters: GetIncidentsFilters) {
+        const conditions: (SQL<unknown> | undefined)[] = [];
+
+        if (filters.search) {
+            const searchId = parseInt(filters.search);
+            if (!Number.isNaN(searchId)) {
+                conditions.push(eq(incidents.id, searchId));
+            } else {
+                conditions.push(ilike(incidents.title, `%${filters.search}%`));
+            }
+        }
+
+        if (filters.vehicleId) conditions.push(eq(incidents.vehicleId, filters.vehicleId));
+        if (filters.clientId) conditions.push(eq(incidents.clientId, filters.clientId));
+        if (filters.assignedToId) conditions.push(eq(incidents.assignedToId, filters.assignedToId));
+
+        if (filters.status?.length) {
+            conditions.push(inArray(incidents.status, filters.status as (typeof incidents.$inferSelect)["status"][]));
+        }
+        if (filters.priority?.length) {
+            conditions.push(inArray(incidents.priority, filters.priority as (typeof incidents.$inferSelect)["priority"][]));
+        }
+        if (filters.type?.length) {
+            conditions.push(inArray(incidents.type, filters.type as (typeof incidents.$inferSelect)["type"][]));
+        }
+        if (filters.slaStatus?.length) {
+            conditions.push(inArray(incidents.slaStatus, filters.slaStatus as NonNullable<(typeof incidents.$inferSelect)["slaStatus"]>[]));
+        }
+
+        if (filters.dateFrom) conditions.push(gte(incidents.createdAt, filters.dateFrom));
+        if (filters.dateTo) conditions.push(lte(incidents.createdAt, filters.dateTo));
+
+        return conditions.length > 0 ? and(...conditions.filter(Boolean)) : undefined;
+    }
+
+    /**
      * Retrieves incidents visible to the user.
      */
-    static async getIncidents(user: CurrentUser) {
+    static async getIncidents(user: CurrentUser, filters: GetIncidentsFilters = {}) {
         // Enforce user soft-deletion check
         await this.checkUserNotDeleted(user.userId);
 
@@ -178,45 +217,42 @@ export class IncidentService {
         } as const;
 
         if (user.role === "ClientUser") {
+            // Enforce RBAC: Clients cannot filter by these fields
+            delete filters.slaStatus
+            delete filters.assignedToId
+            
             const clientRecord = await db.query.clients.findFirst({
                 where: eq(clients.userId, user.userId),
             });
 
             if (!clientRecord) return [];
+            
+            // Force the client ID so they only see their own
+            filters.clientId = user.userId;
+        } else {
+            // For internal users, verify activity status
+            const internalProfile = await this.checkInternalUserActive(user.userId);
+            const resolvedRole = await resolveUserRole(user.userId);
 
-            return await db.query.incidents.findMany({
-                where: eq(incidents.clientId, clientRecord.userId),
-                with: sharedRelations,
-                orderBy: (incidents, { desc }) => [desc(incidents.createdAt)],
-            });
+            if (resolvedRole === "Technician") {
+                const techRecord = await db.query.technicians.findFirst({
+                    where: eq(technicians.internalUserId, internalProfile.userId),
+                });
+
+                if (!techRecord) return [];
+                
+                // Force assignedToId so they only see their assigned tickets
+                filters.assignedToId = techRecord.internalUserId;
+            }
         }
 
-        // For internal users, verify activity status
-        const internalProfile = await this.checkInternalUserActive(user.userId);
-        const resolvedRole = await resolveUserRole(user.userId);
+        const finalWhere = this.buildIncidentFilters(filters);
 
-        if (resolvedRole === "Technician") {
-            const techRecord = await db.query.technicians.findFirst({
-                where: eq(technicians.internalUserId, internalProfile.userId),
-            });
-
-            if (!techRecord) return [];
-
-            return await db.query.incidents.findMany({
-                where: eq(incidents.assignedToId, techRecord.internalUserId),
-                with: sharedRelations,
-                orderBy: (incidents, { desc }) => [desc(incidents.createdAt)],
-            });
-        }
-
-        if (resolvedRole === "Support Manager" || resolvedRole === "Admin") {
-            return await db.query.incidents.findMany({
-                with: sharedRelations,
-                orderBy: (incidents, { desc }) => [desc(incidents.createdAt)],
-            });
-        }
-
-        return [];
+        return await db.query.incidents.findMany({
+            where: finalWhere,
+            with: sharedRelations,
+            orderBy: (incidents, { desc }) => [desc(incidents.createdAt)],
+        });
     }
 
     /**
@@ -267,23 +303,10 @@ export class IncidentService {
             }
         }
 
-        let firstResponseAt = incident.firstResponseAt;
-        let resolutionDueAt = incident.resolutionDueAt;
-        if (!firstResponseAt) {
-            const calculated = SlaService.calculateFirstResponseDates(
-                incident.priority as SlaPriority,
-                new Date()
-            );
-            firstResponseAt = calculated.firstResponseAt;
-            resolutionDueAt = calculated.resolutionDueAt;
-        }
-
         const [updatedIncident] = await db
             .update(incidents)
             .set({
                 status: newStatus,
-                firstResponseAt,
-                resolutionDueAt,
                 ...(newStatus === "Resolved" && { resolvedAt: new Date() }),
                 updatedAt: new Date(),
             })
@@ -358,23 +381,10 @@ export class IncidentService {
             throw createStatusError("Forbidden: Only Support Managers or Admins can assign incidents.", 403);
         }
 
-        let firstResponseAt = incident.firstResponseAt;
-        let resolutionDueAt = incident.resolutionDueAt;
-        if (!firstResponseAt) {
-            const calculated = SlaService.calculateFirstResponseDates(
-                incident.priority as SlaPriority,
-                new Date()
-            );
-            firstResponseAt = calculated.firstResponseAt;
-            resolutionDueAt = calculated.resolutionDueAt;
-        }
-
         const [updatedIncident] = await db
             .update(incidents)
             .set({
                 assignedToId: technicianUserId,
-                firstResponseAt,
-                resolutionDueAt,
                 updatedAt: new Date(),
             })
             .where(eq(incidents.id, incidentId))
@@ -613,16 +623,6 @@ export class IncidentService {
                 resolutionDueAt = calculated.resolutionDueAt;
             }
 
-            const firstResponseTriggered = !firstResponseAt && (assignedToId !== undefined || (status !== undefined && status !== "New"));
-            if (firstResponseTriggered) {
-                const calculated = SlaService.calculateFirstResponseDates(
-                    activePriority as SlaPriority,
-                    new Date()
-                );
-                firstResponseAt = calculated.firstResponseAt;
-                resolutionDueAt = calculated.resolutionDueAt;
-            }
-
             const [updatedIncident] = await db
                 .update(incidents)
                 .set({
@@ -631,7 +631,6 @@ export class IncidentService {
                     ...(assignedToId !== undefined && { assignedToId }),
                     responseDueAt,
                     resolutionDueAt,
-                    firstResponseAt,
                     ...(status === "Resolved" && { resolvedAt: new Date() }),
                     ...(status === "Closed" && { closedAt: new Date(), ...(!incident.resolvedAt && { resolvedAt: new Date() }) }),
                     updatedAt: new Date(),
