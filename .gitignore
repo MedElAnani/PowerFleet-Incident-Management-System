@@ -55,3 +55,5 @@ node_modules/
 postgres_data/
 
 .scannerwork/
+
+GEMINI.md 

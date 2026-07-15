@@ -34,9 +34,9 @@ export const users = pgTable("users", {
     name: text("name").notNull(),
     email: text("email").notNull().unique(),
     password: text("password").notNull(),
-    createdAt: timestamp('created_at').defaultNow(),
-    updatedAt: timestamp('updated_at').defaultNow(),
-    deletedAt: timestamp('deleted_at')
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).defaultNow(),
+    deletedAt: timestamp('deleted_at', { mode: 'date', withTimezone: true })
 })
 
 // 2. InternalUser Table
@@ -45,7 +45,7 @@ export const internal_users = pgTable("internal_users", {
         .references(() => users.id, { onDelete: "cascade" }).primaryKey()
         .notNull(),
     department: text('department').notNull(),
-    hireDate: timestamp('hire_date').defaultNow(),
+    hireDate: timestamp('hire_date', { mode: 'date', withTimezone: true }).defaultNow(),
     isActive: boolean('is_active').notNull().default(true),
 })
 
@@ -89,9 +89,9 @@ export const vehicles = pgTable("vehicles", {
     name: text('name').notNull(),
     imei: text('imei').notNull().unique(),
     licensePlate: text('license_plate').notNull().unique(),
-    createdAt: timestamp('created_at').defaultNow(),
-    updatedAt: timestamp('updated_at').defaultNow(),
-    deletedAt: timestamp('deleted_at'),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).defaultNow(),
+    deletedAt: timestamp('deleted_at', { mode: 'date', withTimezone: true }),
     clientId: integer('client_id')
         .references(() => clients.userId, { onDelete: "cascade" })
         .notNull(),
@@ -110,16 +110,16 @@ export const incidents = pgTable("incidents", {
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
     address: text("address").notNull(),
-    responseDueAt: timestamp("response_due_at"),
-    resolvedAt: timestamp("resolved_at"),
-    resolutionDueAt: timestamp("resolution_due_at"),
-    firstResponseAt: timestamp("first_response_at"),
+    responseDueAt: timestamp("response_due_at", { mode: 'date', withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { mode: 'date', withTimezone: true }),
+    resolutionDueAt: timestamp("resolution_due_at", { mode: 'date', withTimezone: true }),
+    firstResponseAt: timestamp("first_response_at", { mode: 'date', withTimezone: true }),
     slaStatus: slaStatusEnum("sla_status").default("Healthy"),
-    closedAt: timestamp("closed_at"),
+    closedAt: timestamp("closed_at", { mode: 'date', withTimezone: true }),
     resolutionNote: text("resolution_note"),
-    createdAt: timestamp('created_at').defaultNow(),
-    updatedAt: timestamp('updated_at').defaultNow(),
-    deletedAt: timestamp('deleted_at'),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).defaultNow(),
+    deletedAt: timestamp('deleted_at', { mode: 'date', withTimezone: true }),
     clientId: integer('client_id')
         .references(() => clients.userId, { onDelete: "restrict" })
         .notNull(),
@@ -138,9 +138,9 @@ export const incident_comments = pgTable('incident_comments', {
     id: serial('id').primaryKey(),
     body: text('body').notNull(),
     visibility: visibilityEnum('visibility').notNull().default('Public'),
-    createdAt: timestamp('created_at').defaultNow(),
-    updatedAt: timestamp('updated_at').defaultNow(),
-    deletedAt: timestamp('deleted_at'),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).defaultNow(),
+    deletedAt: timestamp('deleted_at', { mode: 'date', withTimezone: true }),
     userId: integer('user_id')
         .references(() => users.id, { onDelete: 'cascade' })
         .notNull(),
@@ -161,7 +161,7 @@ export const incident_events = pgTable("incident_events", {
     oldValue: text('old_value'),
     newValue: text('new_value'),
     message: text('message').notNull(),
-    createdAt: timestamp('created_at').defaultNow()
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow()
 });
 
 // 11. Security Audit Events Table
@@ -173,7 +173,7 @@ export const security_audit_events = pgTable("security_audit_events", {
     errorMessage: text("error_message"),
     incidentTragetId: integer("incident_traget_id"),
     userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { mode: 'date', withTimezone: true }).defaultNow().notNull(),
 })
 
 // 12. Generated Reports Table
@@ -182,8 +182,8 @@ export const generated_reports = pgTable("generated_reports", {
     title: text("title").notNull(),
     summary: text("summary").notNull(),
     stats: json("stats").notNull(),
-    generatedAt: timestamp("generated_at").defaultNow().notNull(),
-    sentAt: timestamp("sent_at"),
+    generatedAt: timestamp("generated_at", { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+    sentAt: timestamp("sent_at", { mode: 'date', withTimezone: true }),
     generatedById: integer("generated_by_id").references(() => internal_users.userId, { onDelete: "cascade" }).notNull()
 })
 
@@ -193,8 +193,8 @@ export const incident_attachments = pgTable('incident_attachments', {
     filename: text('filename').notNull(),
     fileUrl: text('file_url').notNull(),
     fileType: text('file_type').notNull(),
-    createdAt: timestamp('created_at').defaultNow(),
-    deletedAt: timestamp('deleted_at'),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow(),
+    deletedAt: timestamp('deleted_at', { mode: 'date', withTimezone: true }),
     incidentId: integer('incident_id')
         .references(() => incidents.id, { onDelete: 'cascade' })
         .notNull(),
@@ -209,7 +209,7 @@ export const impact_links = pgTable("impact_links", {
     impactLevel: impactLevelEnum("impact_level").notNull(),
     relationship: relationshipEnum("relationship").notNull(),
     clientOpenTickets: integer("client_open_tickets").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { mode: 'date', withTimezone: true }).defaultNow().notNull(),
     incidentId: integer("incident_id")
         .references(() => incidents.id, { onDelete: "cascade" })
         .notNull(),

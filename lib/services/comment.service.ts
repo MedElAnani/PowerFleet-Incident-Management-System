@@ -109,7 +109,7 @@ export class CommentService {
                 newRecord: newComment
             });
 
-            if (user.role !== "ClientUser" && !incidentExistence.firstResponseAt) {
+            if ((user.role === "Admin" || user.role === "Support Manager" || user.role === "Technician") && !incidentExistence.firstResponseAt) {
                 const { firstResponseAt, resolutionDueAt } = SlaService.calculateFirstResponseDates(
                     incidentExistence.priority as SlaPriority
                 );
