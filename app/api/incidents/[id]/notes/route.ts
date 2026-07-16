@@ -6,7 +6,7 @@ import { createInternalNoteSchema } from "@/lib/services/validations/incident";
 // GET: Retrieve all notes for an incident
 export const GET = withAuth(async (
     req: AuthenticatedRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) => {
     try {
         const currentUser = req.user!;
@@ -31,7 +31,7 @@ export const GET = withAuth(async (
 // POST: Create a new internal note
 export const POST = withAuth(async (
     req: AuthenticatedRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) => {
     try {
         const currentUser = req.user!;

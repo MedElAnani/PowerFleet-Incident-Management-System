@@ -262,6 +262,7 @@ export class IncidentService {
 
         return await db.query.incidents.findMany({
             where: finalWhere,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             with: sharedRelations as any,
             orderBy: (incidents, { desc }) => [desc(incidents.createdAt)],
         });

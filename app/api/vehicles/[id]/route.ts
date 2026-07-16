@@ -5,7 +5,7 @@ import { incidents, vehicles, clients } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { VehicleService } from "@/lib/services/vehicle.service";
 
-export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { params: { id: string } }) => {
+export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
     try {
         const { id } = await params;
         const vehicleId = Number(id);
@@ -68,7 +68,7 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
     }
 });
 
-export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { params: { id: string } }) => {
+export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
     try {
         const { id } = await params;
         const vehicleId = Number(id);

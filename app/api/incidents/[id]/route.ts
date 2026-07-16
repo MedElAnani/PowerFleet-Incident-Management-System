@@ -5,7 +5,7 @@ import { incidents, clients, technicians, incident_comments, incident_attachment
 import { eq, and, isNull } from "drizzle-orm";
 import { IncidentService } from "@/lib/services/incident.service";
 
-export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { params: { id: string } }) => {
+export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
     try {
         const { id } = await params;
         const incidentId = Number(id);
@@ -117,8 +117,10 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         });
 
         // Filter internal notes based on RBAC visibility rules
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let filteredNotes: any[] | undefined = undefined;
         if (currentUser.role !== "ClientUser") {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             filteredNotes = incident.internalNotes.filter((note: any) => 
                 note.visibility === "Public" || note.authorId === currentUser.userId
             );
@@ -142,7 +144,7 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
     }
 });
 
-export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { params: { id: string } }) => {
+export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
     try{
         const { id } = await params;
         const incidentId = Number(id);
@@ -184,7 +186,7 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { pa
     }
 } )
 
-export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { params: { id: string } }) => {
+export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
     try {
         const { id } = await params;
         const incidentId = Number(id);

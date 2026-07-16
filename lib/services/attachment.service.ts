@@ -134,7 +134,7 @@ export class AttachmentService {
                 where: eq(admins.internalUserId, authenticatedUserId)
             });
             isAdmin = !!adminRecord;
-        } catch (e) {
+        } catch {
             // Some db/schema might not have admins imported if not careful
             // We'll import admins above if needed
         }

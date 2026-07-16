@@ -10,7 +10,7 @@ const updateNoteSchema = z.object({
 // PATCH: Toggle pin status of a note
 export const PATCH = withAuth(async (
     req: AuthenticatedRequest,
-    { params }: { params: { id: string, noteId: string } }
+    { params }: { params: Promise<{ id: string, noteId: string }> }
 ) => {
     try {
         const currentUser = req.user!;
@@ -42,7 +42,7 @@ export const PATCH = withAuth(async (
 // DELETE: Soft delete a note
 export const DELETE = withAuth(async (
     req: AuthenticatedRequest,
-    { params }: { params: { id: string, noteId: string } }
+    { params }: { params: Promise<{ id: string, noteId: string }> }
 ) => {
     try {
         const currentUser = req.user!;
