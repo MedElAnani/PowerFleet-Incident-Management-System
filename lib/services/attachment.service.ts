@@ -1,7 +1,7 @@
 import { db } from "@/db"
 import { auditLogChanges } from "./audit"
 import { and, eq, isNull } from "drizzle-orm"
-import { incident_attachments, incidents, internal_users, technicians, users } from "@/db/schema"
+import { incident_attachments, incidents, internal_users, technicians, users, admins } from "@/db/schema"
 
 interface CreateAttachmentIncident {
     filename: string
@@ -111,5 +111,44 @@ export class AttachmentService {
             });
         }
         return newAttachment;
+    }
+
+    /**
+     * Soft-deletes an attachment (Owner or Admin only)
+     */
+    static async deleteAttachment(attachmentId: number, authenticatedUserId: number) {
+        await this.checkUserNotDeleted(authenticatedUserId);
+
+        const attachmentRecord = await db.query.incident_attachments.findFirst({
+            where: eq(incident_attachments.id, attachmentId)
+        });
+
+        if (!attachmentRecord || attachmentRecord.deletedAt !== null) {
+            throw createStatusError("Attachment Not Found!", 404);
+        }
+
+        // Check Admin
+        let isAdmin = false;
+        try {
+            const adminRecord = await db.query.admins.findFirst({
+                where: eq(admins.internalUserId, authenticatedUserId)
+            });
+            isAdmin = !!adminRecord;
+        } catch (e) {
+            // Some db/schema might not have admins imported if not careful
+            // We'll import admins above if needed
+        }
+
+        // Verify Ownership or Admin
+        if (!isAdmin && attachmentRecord.uploadedById !== authenticatedUserId) {
+            throw createStatusError("Forbidden: You can only delete your own attachments.", 403);
+        }
+
+        const [deletedAttachment] = await db.update(incident_attachments)
+            .set({ deletedAt: new Date() })
+            .where(eq(incident_attachments.id, attachmentId))
+            .returning();
+
+        return deletedAttachment;
     }
 }

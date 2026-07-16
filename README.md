@@ -168,6 +168,10 @@ The system features an automated Service Level Agreement (SLA) calculation engin
 | POST   | `/api/incidents`                         | Create an incident                        | ClientUser        |
 | GET    | `/api/incidents/:id`                     | Get incident by ID (includes comments)    | Any authenticated |
 | PATCH  | `/api/incidents/:id`                     | Update an incident                        | Any authenticated |
+| GET    | `/api/incidents/:id/notes`               | List internal notes for an incident       | InternalUser      |
+| POST   | `/api/incidents/:id/notes`               | Add an internal note to an incident       | InternalUser      |
+| PATCH  | `/api/incidents/:id/notes/:noteId`       | Toggle pin status of an internal note     | InternalUser      |
+| DELETE | `/api/incidents/:id/notes/:noteId`       | Soft-delete an internal note              | InternalUser      |
 | POST   | `/api/incidents/:id/comments`            | Add a comment to an incident              | Any authenticated |
 | PATCH  | `/api/incidents/:id/comments/:commentId` | Update visibility of a comment            | Any authenticated |
 | GET    | `/api/incidents/:id/events`              | Get incident history timeline events      | Any authenticated |

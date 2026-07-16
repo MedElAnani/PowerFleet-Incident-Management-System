@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { incidents, clients, vehicles, internal_users, technicians, support_managers, users } from "@/db/schema";
+import { incidents, clients, vehicles, internal_users, technicians, support_managers, users, admins } from "@/db/schema";
 import { eq, and, isNull, ilike, inArray, gte, lte, SQL } from "drizzle-orm";
 import { auditLogChanges } from "./audit";
 import { resolveUserRole } from "./role";
@@ -158,8 +158,12 @@ export class IncidentService {
     /**
      * Helper to build dynamic Drizzle WHERE clauses based on filters
      */
-    private static buildIncidentFilters(filters: GetIncidentsFilters) {
+    private static buildIncidentFilters(filters: GetIncidentsFilters, isAdmin: boolean = false) {
         const conditions: (SQL<unknown> | undefined)[] = [];
+
+        if (!isAdmin) {
+            conditions.push(isNull(incidents.deletedAt));
+        }
 
         if (filters.search) {
             const searchId = parseInt(filters.search);
@@ -200,8 +204,17 @@ export class IncidentService {
         // Enforce user soft-deletion check
         await this.checkUserNotDeleted(user.userId);
 
+        let isAdmin = false;
+        let resolvedRole = user.role as string;
+        if (user.role !== "ClientUser") {
+            resolvedRole = await resolveUserRole(user.userId) || user.role;
+            if (resolvedRole === "Admin") isAdmin = true;
+        }
+
         const sharedRelations = {
-            vehicle: true,
+            vehicle: isAdmin ? true : {
+                where: isNull(vehicles.deletedAt)
+            },
             reportedBy: {
                 with: {
                     user: { columns: { password: false } }
@@ -214,7 +227,7 @@ export class IncidentService {
                     }
                 }
             },
-        } as const;
+        };
 
         if (user.role === "ClientUser") {
             // Enforce RBAC: Clients cannot filter by these fields
@@ -232,7 +245,6 @@ export class IncidentService {
         } else {
             // For internal users, verify activity status
             const internalProfile = await this.checkInternalUserActive(user.userId);
-            const resolvedRole = await resolveUserRole(user.userId);
 
             if (resolvedRole === "Technician") {
                 const techRecord = await db.query.technicians.findFirst({
@@ -246,11 +258,11 @@ export class IncidentService {
             }
         }
 
-        const finalWhere = this.buildIncidentFilters(filters);
+        const finalWhere = this.buildIncidentFilters(filters, isAdmin);
 
         return await db.query.incidents.findMany({
             where: finalWhere,
-            with: sharedRelations,
+            with: sharedRelations as any,
             orderBy: (incidents, { desc }) => [desc(incidents.createdAt)],
         });
     }
@@ -655,5 +667,44 @@ export class IncidentService {
         }
 
         throw createStatusError("Forbidden: Unrecognized role.", 403);
+    }
+
+    /**
+     * Soft-deletes an incident (Admin only)
+     */
+    static async deleteIncident(incidentId: number, authenticatedUserId: number) {
+        await this.checkUserNotDeleted(authenticatedUserId);
+        
+        const internalUserRecord = await db.query.internal_users.findFirst({
+            where: and(
+                eq(internal_users.userId, authenticatedUserId),
+                eq(internal_users.isActive, true)
+            )
+        });
+        if (!internalUserRecord) {
+            throw createStatusError("Only an Admin can perform this action.", 403);
+        }
+
+        const adminRecord = await db.query.admins.findFirst({
+            where: eq(admins.internalUserId, authenticatedUserId)
+        });
+        if (!adminRecord) {
+            throw createStatusError("Only an Admin can perform this action.", 403);
+        }
+
+        const incidentRecord = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        if (!incidentRecord || incidentRecord.deletedAt !== null) {
+            throw createStatusError("Incident Not Found!", 404);
+        }
+
+        const [deletedIncident] = await db.update(incidents)
+            .set({ deletedAt: new Date(), updatedAt: new Date() })
+            .where(eq(incidents.id, incidentId))
+            .returning();
+
+        return deletedIncident;
     }
 }

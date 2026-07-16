@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth"; 
 import { db } from "@/db"
-import { incidents, clients, technicians } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { incidents, clients, technicians, incident_comments, incident_attachments, incident_internal_notes } from "@/db/schema";
+import { eq, and, isNull } from "drizzle-orm";
 import { IncidentService } from "@/lib/services/incident.service";
 
 export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { params: { id: string } }) => {
@@ -20,10 +20,17 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         
         // Find the incident by ID with comments and their authors
         const { resolveUserRole } = await import("@/lib/services/role");
+        const resolvedRole = await resolveUserRole(currentUser.userId);
+        const isAdmin = resolvedRole === "Admin";
+
         const incident = await db.query.incidents.findFirst({
-            where: eq(incidents.id, incidentId),
+            where: and(
+                eq(incidents.id, incidentId),
+                isAdmin ? undefined : isNull(incidents.deletedAt)
+            ),
             with: {
                 comments: {
+                    where: isAdmin ? undefined : isNull(incident_comments.deletedAt),
                     with: {
                         user: {
                             columns: {
@@ -36,6 +43,26 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
                             }
                         }
                     }
+                },
+                attachments: isAdmin ? true : {
+                    where: isNull(incident_attachments.deletedAt)
+                },
+                internalNotes: {
+                    where: isAdmin ? undefined : isNull(incident_internal_notes.deletedAt),
+                    with: {
+                        author: {
+                            with: {
+                                user: {
+                                    columns: {
+                                        id: true,
+                                        name: true,
+                                        email: true
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    orderBy: (notes, { desc }) => [desc(notes.isPinned), desc(notes.createdAt)]
                 }
             }
         });
@@ -60,8 +87,6 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
                 );
             }
         }
-        
-        const resolvedRole = await resolveUserRole(currentUser.userId);
         
         if(resolvedRole === "Technician"){
             const techRecord = await db.query.technicians.findFirst({
@@ -91,10 +116,19 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
             return false;
         });
 
-        // Return the incident with filtered comments
+        // Filter internal notes based on RBAC visibility rules
+        let filteredNotes: any[] | undefined = undefined;
+        if (currentUser.role !== "ClientUser") {
+            filteredNotes = incident.internalNotes.filter((note: any) => 
+                note.visibility === "Public" || note.authorId === currentUser.userId
+            );
+        }
+
+        // Return the incident with filtered comments and notes
         const incidentWithFilteredComments = {
             ...incident,
-            comments: filteredComments
+            comments: filteredComments,
+            internalNotes: filteredNotes
         };
         
         return NextResponse.json(incidentWithFilteredComments);
@@ -149,3 +183,25 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { pa
         );
     }
 } )
+
+export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { params: { id: string } }) => {
+    try {
+        const { id } = await params;
+        const incidentId = Number(id);
+        const currentUser = req.user!;
+        
+        if (isNaN(incidentId)) {
+            return NextResponse.json({ error: "Invalid incident ID" }, { status: 400 });
+        }
+        
+        await IncidentService.deleteIncident(incidentId, currentUser.userId);
+        
+        return NextResponse.json({ success: true, message: "Incident deleted successfully." });
+    } catch (error: unknown) {
+        const err = error as { status?: number; message?: string };
+        if (err.status) {
+            return NextResponse.json({ error: err.message }, { status: err.status });
+        }
+        return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
+    }
+}, "Admin");

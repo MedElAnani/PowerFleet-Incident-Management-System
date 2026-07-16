@@ -95,4 +95,44 @@ export class VehicleService {
         
         return newVehicle;
     }
+
+    /**
+     * Soft-deletes a vehicle (Admin only)
+     */
+    static async deleteVehicle(vehicleId: number, authenticatedUserId: number) {
+        // Enforce soft-deletion check on creator
+        await this.checkUserNotDeleted(authenticatedUserId);
+
+        const internalUserRecord = await db.query.internal_users.findFirst({
+            where: and(
+                eq(internal_users.userId, authenticatedUserId),
+                eq(internal_users.isActive, true)
+            )
+        });
+        if (!internalUserRecord) {
+            throw createStatusError("Only an Admin can perform this action.", 403);
+        }
+
+        const adminRecord = await db.query.admins.findFirst({
+            where: eq(admins.internalUserId, authenticatedUserId)
+        });
+        if (!adminRecord) {
+            throw createStatusError("Only an Admin can perform this action.", 403);
+        }
+
+        const vehicleRecord = await db.query.vehicles.findFirst({
+            where: eq(vehicles.id, vehicleId)
+        });
+
+        if (!vehicleRecord || vehicleRecord.deletedAt !== null) {
+            throw createStatusError("Vehicle Not Found!", 404);
+        }
+
+        const [deletedVehicle] = await db.update(vehicles)
+            .set({ deletedAt: new Date(), updatedAt: new Date() })
+            .where(eq(vehicles.id, vehicleId))
+            .returning();
+
+        return deletedVehicle;
+    }
 }

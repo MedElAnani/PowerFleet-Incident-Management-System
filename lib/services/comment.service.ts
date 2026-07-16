@@ -208,4 +208,37 @@ export class CommentService {
         
         return updatedComment;
     }
+
+    /**
+     * Soft-deletes a comment (Owner or Admin only)
+     */
+    static async deleteComment(commentId: number, authenticatedUserId: number) {
+        await this.checkUserNotDeleted(authenticatedUserId);
+
+        const commentRecord = await db.query.incident_comments.findFirst({
+            where: eq(incident_comments.id, commentId)
+        });
+
+        if (!commentRecord || commentRecord.deletedAt !== null) {
+            throw createStatusError("Comment Not Found!", 404);
+        }
+
+        // Check Admin
+        const adminRecord = await db.query.admins.findFirst({
+            where: eq(admins.internalUserId, authenticatedUserId)
+        });
+        const isAdmin = !!adminRecord;
+
+        // Verify Ownership or Admin
+        if (!isAdmin && commentRecord.userId !== authenticatedUserId) {
+            throw createStatusError("Forbidden: You can only delete your own comments.", 403);
+        }
+
+        const [deletedComment] = await db.update(incident_comments)
+            .set({ deletedAt: new Date(), updatedAt: new Date() })
+            .where(eq(incident_comments.id, commentId))
+            .returning();
+
+        return deletedComment;
+    }
 }
