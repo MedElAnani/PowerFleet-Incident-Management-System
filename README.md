@@ -160,6 +160,7 @@ The system features an automated Service Level Agreement (SLA) calculation engin
 | ------ | ---------------------- | ------------------------ | ------------- |
 | POST   | `/api/auth/register`   | Register a new client    | No            |
 | POST   | `/api/auth/login`      | Login, receive JWT       | No            |
+| POST   | `/api/auth/logout`     | Logout, clear session    | Yes           |
 
 ### Incidents
 
