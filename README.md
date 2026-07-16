@@ -89,8 +89,9 @@ To satisfy strict role-less polymorphic inheritance requirements, the database c
 *   `clients` and `internal_users` inherit from `users` (using their primary key as a foreign key pointing to `users.id`).
 *   `admins`, `support_managers`, and `technicians` inherit from `internal_users`.
 
-### Soft Delete Protocol
-Entity soft-deletion does not use redundant boolean columns. Instead, it relies purely on nullability checks on `deletedAt: timestamp`. Queries filter active entities using `isNull(deletedAt)`.
+### Soft Delete Protocol & Global Visibility
+Entity soft-deletion does not use redundant boolean columns. Instead, it relies purely on nullability checks on `deletedAt: timestamp`.
+**Global Visibility Rule:** If an entity (Incident, Vehicle, Comment, Attachment, or Internal Note) is soft-deleted, it becomes strictly invisible to all users **except Admins**, deeply integrated directly into Drizzle ORM queries. Even original owners cannot view their soft-deleted items.
 
 ### Tables
 
@@ -168,12 +169,16 @@ The system features an automated Service Level Agreement (SLA) calculation engin
 | POST   | `/api/incidents`                         | Create an incident                        | ClientUser        |
 | GET    | `/api/incidents/:id`                     | Get incident by ID (includes comments)    | Any authenticated |
 | PATCH  | `/api/incidents/:id`                     | Update an incident                        | Any authenticated |
+| DELETE | `/api/incidents/:id`                     | Soft-delete an incident                   | Admin             |
 | GET    | `/api/incidents/:id/notes`               | List internal notes for an incident       | InternalUser      |
 | POST   | `/api/incidents/:id/notes`               | Add an internal note to an incident       | InternalUser      |
 | PATCH  | `/api/incidents/:id/notes/:noteId`       | Toggle pin status of an internal note     | InternalUser      |
 | DELETE | `/api/incidents/:id/notes/:noteId`       | Soft-delete an internal note              | InternalUser      |
 | POST   | `/api/incidents/:id/comments`            | Add a comment to an incident              | Any authenticated |
 | PATCH  | `/api/incidents/:id/comments/:commentId` | Update visibility of a comment            | Any authenticated |
+| DELETE | `/api/incidents/:id/comments/:commentId` | Soft-delete a comment                     | Owner / Admin     |
+| POST   | `/api/incidents/:id/attachment`          | Upload an attachment to an incident       | Any authenticated |
+| DELETE | `/api/incidents/:id/attachment/:id`      | Soft-delete an attachment                 | Owner / Admin     |
 | GET    | `/api/incidents/:id/events`              | Get incident history timeline events      | Any authenticated |
 | GET    | `/api/events`                            | List global system audit logs             | InternalUser      |
 | POST   | `/api/cron/sla`                          | Trigger periodic SLA checks on open tickets| System/Cron Runner|
@@ -193,6 +198,7 @@ Supports robust search queries dynamically built by Drizzle:
 | ------ | ---------------------- | ------------------------ | ----------------- |
 | POST   | `/api/vehicles`        | Create a vehicle         | Admin             |
 | GET    | `/api/vehicles/:id`    | Get vehicle by ID        | Any authenticated |
+| DELETE | `/api/vehicles/:id`    | Soft-delete a vehicle    | Admin             |
 
 ---
 
