@@ -11,7 +11,7 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         const vehicleId = Number(id);
         const currentUser = req.user!;
         
-        if (isNaN(vehicleId)) {
+        if (Number.isNaN(vehicleId)) {
             return NextResponse.json(
                 { error: "Invalid vehicle ID" },
                 { status: 400 }
@@ -74,7 +74,7 @@ export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { p
         const vehicleId = Number(id);
         const currentUser = req.user!;
         
-        if (isNaN(vehicleId)) {
+        if (Number.isNaN(vehicleId)) {
             return NextResponse.json({ error: "Invalid vehicle ID" }, { status: 400 });
         }
         

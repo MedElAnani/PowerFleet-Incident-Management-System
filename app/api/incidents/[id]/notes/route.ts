@@ -11,9 +11,9 @@ export const GET = withAuth(async (
     try {
         const currentUser = req.user!;
         const { id } = await params;
-        const incidentId = parseInt(id);
+        const incidentId = Number.parseInt(id);
 
-        if (isNaN(incidentId)) {
+        if (Number.isNaN(incidentId)) {
             return NextResponse.json({ error: "Invalid Incident ID" }, { status: 400 });
         }
 
@@ -36,9 +36,9 @@ export const POST = withAuth(async (
     try {
         const currentUser = req.user!;
         const { id } = await params;
-        const incidentId = parseInt(id);
+        const incidentId = Number.parseInt(id);
 
-        if (isNaN(incidentId)) {
+        if (Number.isNaN(incidentId)) {
             return NextResponse.json({ error: "Invalid Incident ID" }, { status: 400 });
         }
 

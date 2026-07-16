@@ -8,14 +8,14 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { pa
         const incidentId = Number(id);
         const targetCommentId = Number(commentId);
         
-        if (isNaN(incidentId)) {
+        if (Number.isNaN(incidentId)) {
             return NextResponse.json(
                 { error: "Invalid incident ID" },
                 { status: 400 }
             );
         }
 
-        if (isNaN(targetCommentId)) {
+        if (Number.isNaN(targetCommentId)) {
             return NextResponse.json(
                 { error: "Invalid comment ID" },
                 { status: 400 }
@@ -66,7 +66,7 @@ export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { p
         const targetCommentId = Number(commentId);
         const currentUser = req.user!;
         
-        if (isNaN(targetCommentId)) {
+        if (Number.isNaN(targetCommentId)) {
             return NextResponse.json({ error: "Invalid comment ID" }, { status: 400 });
         }
         

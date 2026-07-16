@@ -105,7 +105,7 @@ export class InternalNoteService {
             where: eq(incident_internal_notes.id, noteId)
         });
         
-        if (!note || note.deletedAt !== null) {
+        if (note?.deletedAt !== null) {
             throw createStatusError("Note Not Found!", 404);
         }
         
@@ -133,7 +133,7 @@ export class InternalNoteService {
             where: eq(incident_internal_notes.id, noteId)
         });
         
-        if (!note || note.deletedAt !== null) {
+        if (note?.deletedAt !== null) {
             throw createStatusError("Note Not Found!", 404);
         }
         

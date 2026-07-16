@@ -11,7 +11,7 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         const incidentId = Number(id);
         const currentUser = req.user!;
         
-        if (isNaN(incidentId)) {
+        if (Number.isNaN(incidentId)) {
             return NextResponse.json(
                 { error: "Invalid incident ID" },
                 { status: 400 }
@@ -150,7 +150,7 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { pa
         const incidentId = Number(id);
         const currentUser = req.user!;
         
-        if (isNaN(incidentId)) {
+        if (Number.isNaN(incidentId)) {
             return NextResponse.json(
                 { error: "Invalid incident ID" },
                 { status: 400 }
@@ -192,7 +192,7 @@ export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { p
         const incidentId = Number(id);
         const currentUser = req.user!;
         
-        if (isNaN(incidentId)) {
+        if (Number.isNaN(incidentId)) {
             return NextResponse.json({ error: "Invalid incident ID" }, { status: 400 });
         }
         

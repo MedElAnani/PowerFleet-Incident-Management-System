@@ -15,9 +15,9 @@ export const PATCH = withAuth(async (
     try {
         const currentUser = req.user!;
         const { noteId: noteIdStr } = await params;
-        const noteId = parseInt(noteIdStr);
+        const noteId = Number.parseInt(noteIdStr);
 
-        if (isNaN(noteId)) {
+        if (Number.isNaN(noteId)) {
             return NextResponse.json({ error: "Invalid Note ID" }, { status: 400 });
         }
 
@@ -47,9 +47,9 @@ export const DELETE = withAuth(async (
     try {
         const currentUser = req.user!;
         const { noteId: noteIdStr } = await params;
-        const noteId = parseInt(noteIdStr);
+        const noteId = Number.parseInt(noteIdStr);
 
-        if (isNaN(noteId)) {
+        if (Number.isNaN(noteId)) {
             return NextResponse.json({ error: "Invalid Note ID" }, { status: 400 });
         }
 

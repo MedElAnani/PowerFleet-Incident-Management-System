@@ -166,7 +166,7 @@ export class IncidentService {
         }
 
         if (filters.search) {
-            const searchId = parseInt(filters.search);
+            const searchId = Number.parseInt(filters.search);
             if (!Number.isNaN(searchId)) {
                 conditions.push(eq(incidents.id, searchId));
             } else {
@@ -697,7 +697,7 @@ export class IncidentService {
             where: eq(incidents.id, incidentId)
         });
 
-        if (!incidentRecord || incidentRecord.deletedAt !== null) {
+        if (incidentRecord?.deletedAt !== null) {
             throw createStatusError("Incident Not Found!", 404);
         }
 

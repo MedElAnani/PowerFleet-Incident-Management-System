@@ -123,7 +123,7 @@ export class AttachmentService {
             where: eq(incident_attachments.id, attachmentId)
         });
 
-        if (!attachmentRecord || attachmentRecord.deletedAt !== null) {
+        if (attachmentRecord?.deletedAt !== null) {
             throw createStatusError("Attachment Not Found!", 404);
         }
 

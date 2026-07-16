@@ -124,7 +124,7 @@ export class VehicleService {
             where: eq(vehicles.id, vehicleId)
         });
 
-        if (!vehicleRecord || vehicleRecord.deletedAt !== null) {
+        if (vehicleRecord?.deletedAt !== null) {
             throw createStatusError("Vehicle Not Found!", 404);
         }
 

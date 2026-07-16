@@ -219,7 +219,7 @@ export class CommentService {
             where: eq(incident_comments.id, commentId)
         });
 
-        if (!commentRecord || commentRecord.deletedAt !== null) {
+        if (commentRecord?.deletedAt !== null) {
             throw createStatusError("Comment Not Found!", 404);
         }
 

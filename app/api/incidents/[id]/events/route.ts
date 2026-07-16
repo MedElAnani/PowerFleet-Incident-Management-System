@@ -9,7 +9,7 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         const { id } = await params;
         const incidentId = Number(id);
         
-        if (isNaN(incidentId)) {
+        if (Number.isNaN(incidentId)) {
             return NextResponse.json({ error: "Invalid incident ID" }, { status: 400 });
         }
 

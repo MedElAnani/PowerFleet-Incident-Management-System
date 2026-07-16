@@ -8,7 +8,7 @@ export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { p
         const targetAttachmentId = Number(attachmentId);
         const currentUser = req.user!;
         
-        if (isNaN(targetAttachmentId)) {
+        if (Number.isNaN(targetAttachmentId)) {
             return NextResponse.json({ error: "Invalid attachment ID" }, { status: 400 });
         }
         
