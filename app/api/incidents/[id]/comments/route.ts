@@ -6,40 +6,27 @@ export const POST = withAuth(async (req: AuthenticatedRequest, { params }: { par
     try {
         const { id } = await params;
         const incidentId = Number(id);
-        
         if (Number.isNaN(incidentId)) {
-            return NextResponse.json(
-                { error: "Invalid incident ID" },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: "Invalid incident ID" }, { status: 400 });
         }
 
-        const currentUser = req.user!;
-        
-        let body;
-        try {
-            body = await req.json();
-        } catch {
+        const body = await req.json().catch(() => null);
+        if (!body) {
             return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
         }
         
         const newComment = await CommentService.createComment(body, {
-            userId: currentUser.userId,
-            role: currentUser.role as "ClientUser" | "InternalUser"
+            userId: req.user!.userId,
+            role: req.user!.role as "ClientUser" | "InternalUser"
         }, incidentId);
 
         return NextResponse.json(newComment, { status: 201 });
     } catch (error: unknown) {
-        console.error("Create comment route caught an error:", error);
-        const err = error as { status?: number; message?: string };
-
-        if (err.status) {
-            return NextResponse.json({ error: err.message }, { status: err.status });
-        }
-
+        console.error("Create comment error:", error);
+        const err = error as Error & { status?: number };
         return NextResponse.json(
-            { error: "Internal Server Error", details: err.message },
-            { status: 500 }
+            { error: err.message || "Internal Server Error" },
+            { status: err.status || 500 }
         );
     }
 });

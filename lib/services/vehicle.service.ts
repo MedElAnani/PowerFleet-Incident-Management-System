@@ -1,7 +1,7 @@
 import { db } from '@/db'
-import { clients, vehicles, internal_users, admins, users } from '@/db/schema'
+import { clients, vehicles, users } from '@/db/schema'
 import { eq, and, or, isNull } from 'drizzle-orm'
-
+import { verifyAdminAccess } from '@/lib/services/role'
 interface StatusError extends Error {
     status?: number;
 }
@@ -49,22 +49,7 @@ export class VehicleService {
         // 2. Enforce soft-deletion check on client owner
         await this.checkUserNotDeleted(clientId);
         
-        const internalUserRecord = await db.query.internal_users.findFirst({
-            where: and(
-                eq(internal_users.userId, authenticatedUserId),
-                eq(internal_users.isActive, true)
-            )
-        });
-        if (!internalUserRecord) {
-            throw createStatusError("Only an Admin can perform this action.", 403);
-        }
-
-        const adminRecord = await db.query.admins.findFirst({
-            where: eq(admins.internalUserId, authenticatedUserId)
-        });
-        if (!adminRecord) {
-            throw createStatusError("Only an Admin can perform this action.", 403);
-        }
+        await verifyAdminAccess(authenticatedUserId);
         
         const clientRecord = await db.query.clients.findFirst({
             where: eq(clients.userId, clientId)
@@ -103,22 +88,7 @@ export class VehicleService {
         // Enforce soft-deletion check on creator
         await this.checkUserNotDeleted(authenticatedUserId);
 
-        const internalUserRecord = await db.query.internal_users.findFirst({
-            where: and(
-                eq(internal_users.userId, authenticatedUserId),
-                eq(internal_users.isActive, true)
-            )
-        });
-        if (!internalUserRecord) {
-            throw createStatusError("Only an Admin can perform this action.", 403);
-        }
-
-        const adminRecord = await db.query.admins.findFirst({
-            where: eq(admins.internalUserId, authenticatedUserId)
-        });
-        if (!adminRecord) {
-            throw createStatusError("Only an Admin can perform this action.", 403);
-        }
+        await verifyAdminAccess(authenticatedUserId);
 
         const vehicleRecord = await db.query.vehicles.findFirst({
             where: eq(vehicles.id, vehicleId)
