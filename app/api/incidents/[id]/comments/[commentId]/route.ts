@@ -8,14 +8,14 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { pa
         const incidentId = Number(id);
         const targetCommentId = Number(commentId);
         
-        if (isNaN(incidentId)) {
+        if (Number.isNaN(incidentId)) {
             return NextResponse.json(
                 { error: "Invalid incident ID" },
                 { status: 400 }
             );
         }
 
-        if (isNaN(targetCommentId)) {
+        if (Number.isNaN(targetCommentId)) {
             return NextResponse.json(
                 { error: "Invalid comment ID" },
                 { status: 400 }
@@ -57,5 +57,27 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { pa
             { error: "Internal Server Error", details: err.message },
             { status: 500 }
         );
+    }
+});
+
+export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string, commentId: string }> }) => {
+    try {
+        const { commentId } = await params;
+        const targetCommentId = Number(commentId);
+        const currentUser = req.user!;
+        
+        if (Number.isNaN(targetCommentId)) {
+            return NextResponse.json({ error: "Invalid comment ID" }, { status: 400 });
+        }
+        
+        await CommentService.deleteComment(targetCommentId, currentUser.userId);
+        
+        return NextResponse.json({ success: true, message: "Comment deleted successfully." });
+    } catch (error: unknown) {
+        const err = error as { status?: number; message?: string };
+        if (err.status) {
+            return NextResponse.json({ error: err.message }, { status: err.status });
+        }
+        return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
     }
 });

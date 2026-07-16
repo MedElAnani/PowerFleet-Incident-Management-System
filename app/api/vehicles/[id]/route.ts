@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server"
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth"; 
 import { db } from "@/db"
-import { vehicles, clients } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { incidents, vehicles, clients } from "@/db/schema";
+import { eq, and, isNull } from "drizzle-orm";
+import { VehicleService } from "@/lib/services/vehicle.service";
 
-export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { params: { id: string } }) => {
+export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
     try {
         const { id } = await params;
         const vehicleId = Number(id);
         const currentUser = req.user!;
         
-        if (isNaN(vehicleId)) {
+        if (Number.isNaN(vehicleId)) {
             return NextResponse.json(
                 { error: "Invalid vehicle ID" },
                 { status: 400 }
@@ -18,10 +19,19 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         }
         
         // Find the incident by ID
+        const { resolveUserRole } = await import("@/lib/services/role");
+        const resolvedRole = await resolveUserRole(currentUser.userId);
+        const isAdmin = resolvedRole === "Admin";
+
         const vehicle = await db.query.vehicles.findFirst({
-            where: eq(vehicles.id, vehicleId),
+            where: and(
+                eq(vehicles.id, vehicleId),
+                isAdmin ? undefined : isNull(vehicles.deletedAt)
+            ),
             with: {
-                incidents: true
+                incidents: isAdmin ? true : {
+                    where: isNull(incidents.deletedAt)
+                }
             }
         });
         
@@ -57,3 +67,25 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
     }
 });
+
+export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
+    try {
+        const { id } = await params;
+        const vehicleId = Number(id);
+        const currentUser = req.user!;
+        
+        if (Number.isNaN(vehicleId)) {
+            return NextResponse.json({ error: "Invalid vehicle ID" }, { status: 400 });
+        }
+        
+        await VehicleService.deleteVehicle(vehicleId, currentUser.userId);
+        
+        return NextResponse.json({ success: true, message: "Vehicle deleted successfully." });
+    } catch (error: unknown) {
+        const err = error as { status?: number; message?: string };
+        if (err.status) {
+            return NextResponse.json({ error: err.message }, { status: err.status });
+        }
+        return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
+    }
+}, "Admin");

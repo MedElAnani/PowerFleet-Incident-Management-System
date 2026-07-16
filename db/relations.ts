@@ -13,7 +13,8 @@ import {
     generated_reports,
     security_audit_events,
     incident_attachments,
-    impact_links
+    impact_links,
+    incident_internal_notes
 } from "./schema";
 
 // 1. User Table Relations
@@ -36,6 +37,7 @@ export const internalUsersRelations = relations(internal_users, ({ one, many }) 
     managerProfile: one(support_managers),
     technicianProfile: one(technicians),
     reports: many(generated_reports),
+    internalNotes: many(incident_internal_notes),
 }));
 
 // 3. Role-Specific Profile Relations
@@ -109,6 +111,7 @@ export const incidentsRelations = relations(incidents, ({ one, many }) => ({
     events: many(incident_events),
     attachments: many(incident_attachments),
     impactLinks: many(impact_links),
+    internalNotes: many(incident_internal_notes),
 }));
 
 // 8. Incident Comments Table Relations
@@ -172,5 +175,17 @@ export const impactLinksRelations = relations(impact_links, ({ one }) => ({
     vehicle: one(vehicles, {
         fields: [impact_links.vehicleId],
         references: [vehicles.id],
+    }),
+}));
+
+// 14. Incident Internal Notes Relations
+export const incidentInternalNotesRelations = relations(incident_internal_notes, ({ one }) => ({
+    incident: one(incidents, {
+        fields: [incident_internal_notes.incidentId],
+        references: [incidents.id],
+    }),
+    author: one(internal_users, {
+        fields: [incident_internal_notes.authorId],
+        references: [internal_users.userId],
     }),
 }));
