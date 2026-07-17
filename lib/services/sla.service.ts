@@ -12,6 +12,11 @@ function createStatusError(message: string, status: number): StatusError {
     return error;
 }
 
+export type SlaStatus = 
+    | "Healthy" | "Met" | "Met_With_Response_Breached" | "Met_With_Resolution_Breached" 
+    | "Breached_Both" | "Warning_Response" | "Warning_Resolution" | "Breached_Response" 
+    | "Breached_Resolution" ;
+
 export type SlaPriority = "Low" | "Medium" | "High" | "Critical";
 
 interface SlaDuration {
@@ -87,10 +92,62 @@ export class SlaService {
         return { responseDueAt, resolutionDueAt };
     }
 
+    private static evaluateTerminalSlaStatus(
+        firstResponseTime: number | null,
+        responseDueTime: number,
+        resolvedTime: number,
+        resolutionDueTime: number
+    ): SlaStatus {
+        const responseOnTime = firstResponseTime !== null && firstResponseTime <= responseDueTime;
+        const resolutionOnTime = resolvedTime <= resolutionDueTime;
+
+        if (responseOnTime && resolutionOnTime) {
+            return "Met";
+        }
+        if (!responseOnTime && resolutionOnTime) {
+            return "Met_With_Response_Breached";
+        }
+        if (responseOnTime && !resolutionOnTime) {
+            return "Met_With_Resolution_Breached";
+        }
+        return "Breached_Both";
+    }
+
+    private static evaluateActiveSlaStatus(
+        firstResponseTime: number | null,
+        responseDueTime: number,
+        resolutionDueTime: number,
+        currentTime: number,
+        priority: SlaPriority
+    ): SlaStatus {
+        if (firstResponseTime === null) {
+            const remainingResponse = responseDueTime - currentTime;
+            if (remainingResponse <= 0) {
+                const remainingResolution = resolutionDueTime - currentTime;
+                return remainingResolution <= 0 ? "Breached_Both" : "Breached_Response";
+            }
+            const threshold = SLA_CONFIG[priority].responseWarningMs;
+            return remainingResponse <= threshold ? "Warning_Response" : "Healthy";
+        }
+
+        const responseOnTime = firstResponseTime <= responseDueTime;
+        if (responseOnTime) {
+            const remainingResolution = resolutionDueTime - currentTime;
+            if (remainingResolution <= 0) {
+                return "Breached_Resolution";
+            }
+            const threshold = SLA_CONFIG[priority].resolutionWarningMs;
+            return remainingResolution <= threshold ? "Warning_Resolution" : "Healthy";
+        }
+
+        const remainingResolution = resolutionDueTime - currentTime;
+        return remainingResolution <= 0 ? "Breached_Both" : "Breached_Response";
+    }
+
     /**
      * Calculates and updates the SLA status for a specific incident.
      */
-    static async calculateSLA(incidentId: number, now: Date = new Date()): Promise<string> {
+    static async calculateSLA(incidentId: number, now: Date = new Date()): Promise<SlaStatus> {
         const incident = await db.query.incidents.findFirst({
             where: eq(incidents.id, incidentId)
         });
@@ -117,78 +174,24 @@ export class SlaService {
         const firstResponseTime = firstResponseAt ? new Date(firstResponseAt).getTime() : null;
         const resolvedTime = resolvedAt ? new Date(resolvedAt).getTime() : null;
         const currentTime = now.getTime();
-        
-        type SlaStatus = 
-            | "Healthy" | "Met" | "Met_With_Response_Breached" | "Met_With_Resolution_Breached" 
-            | "Breached_Both" | "Warning_Response" | "Warning_Resolution" | "Breached_Response" 
-            | "Breached_Resolution" ;
             
         let computedStatus: SlaStatus = "Healthy";
 
         if (resolvedTime !== null) {
-            // Terminal States
-            const responseOnTime = firstResponseTime !== null && firstResponseTime <= responseDueTime;
-            const resolutionOnTime = resolvedTime <= resolutionDueTime;
-
-            if (responseOnTime && resolutionOnTime) {
-                computedStatus = "Met";
-            } else if (!responseOnTime && resolutionOnTime) {
-                computedStatus = "Met_With_Response_Breached";
-            } else if (responseOnTime && !resolutionOnTime) {
-                computedStatus = "Met_With_Resolution_Breached";
-            } else {
-                computedStatus = "Breached_Both";
-            }
+            computedStatus = this.evaluateTerminalSlaStatus(
+                firstResponseTime,
+                responseDueTime,
+                resolvedTime,
+                resolutionDueTime
+            );
         } else {
-            // Active (Open) States
-            if (firstResponseTime === null) {
-                const remainingResponse = responseDueTime - currentTime;
-
-                if (remainingResponse <= 0) {
-                    const remainingResolution = resolutionDueTime - currentTime;
-                    if (remainingResolution <= 0) {
-                        computedStatus = "Breached_Both";
-                    } else {
-                        computedStatus = "Breached_Response";
-                    }
-                } else {
-                    // Warning limits for Response
-                    const threshold = SLA_CONFIG[priority as SlaPriority].responseWarningMs;
-
-                    if (remainingResponse <= threshold) {
-                        computedStatus = "Warning_Response";
-                    } else {
-                        computedStatus = "Healthy";
-                    }
-                }
-            } else {
-                const responseOnTime = firstResponseTime <= responseDueTime;
-
-                if (responseOnTime) {
-                    const remainingResolution = resolutionDueTime - currentTime;
-
-                    if (remainingResolution <= 0) {
-                        computedStatus = "Breached_Resolution";
-                    } else {
-                        // Warning limits for Resolution
-                        const threshold = SLA_CONFIG[priority as SlaPriority].resolutionWarningMs;
-
-                        if (remainingResolution <= threshold) {
-                            computedStatus = "Warning_Resolution";
-                        } else {
-                            computedStatus = "Healthy";
-                        }
-                    }
-                } else {
-                    // Response Breached, Resolution Active/Breached
-                    const remainingResolution = resolutionDueTime - currentTime;
-                    if (remainingResolution <= 0) {
-                        computedStatus = "Breached_Both";
-                    } else {
-                        computedStatus = "Breached_Response";
-                    }
-                }
-            }
+            computedStatus = this.evaluateActiveSlaStatus(
+                firstResponseTime,
+                responseDueTime,
+                resolutionDueTime,
+                currentTime,
+                priority as SlaPriority
+            );
         }
 
         // Write Optimization: Only update database if status has changed

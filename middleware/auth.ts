@@ -18,7 +18,7 @@ export function withAuth(handler: NextRouteHandler, requiredType?: "Admin" | "Su
         try {
             // 1. Check For Authorization Header
             const authHeader = request.headers.get("authorization")
-            if(!authHeader || !authHeader.startsWith("Bearer ")) {
+            if(!authHeader?.startsWith("Bearer ")) {
                 return NextResponse.json(
                     { error: "Unauthorized: Missing token" }, {status: 401}
                 )

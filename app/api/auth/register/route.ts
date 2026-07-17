@@ -21,7 +21,7 @@ export async function POST(req: Request) {
         const trimmedEmail = email.trim().toLowerCase()
         
         // Regex Validation
-        const emailRegex = /.+@.+\..+/
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
         if(!emailRegex.test(trimmedEmail)) {
             return NextResponse.json(
                 { success: false, error: "Email Format Not Valid !" },
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
         }
         
         // Regex Validation for Password
-        const passwordRegex = /^[A-Z](?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).{5,}$/
+        const passwordRegex = /^[A-Z](?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{5,}$/
 
         if (!passwordRegex.test(password)) {
             return NextResponse.json(

@@ -41,6 +41,35 @@ export class CommentService {
         return userRecord;
     }
 
+    private static async checkCreateAuthorization(user: CurrentUser, incidentExistence: typeof incidents.$inferSelect) {
+        if (user.role === "ClientUser") {
+            if (user.userId !== incidentExistence.reportedById) {
+                throw createStatusError("Forbidden: You cannot comment on this incident!", 403);
+            }
+            return;
+        }
+
+        const internalUserRecord = await db.query.internal_users.findFirst({
+            where: eq(internal_users.userId, user.userId)
+        });
+        
+        if (!internalUserRecord) {
+            throw createStatusError("Forbidden: You cannot comment on this incident!", 403);
+        }
+        
+        if (!internalUserRecord.isActive) {
+            throw createStatusError("Forbidden: Your account is inactive.", 403);
+        }
+        
+        const techRecord = await db.query.technicians.findFirst({
+            where: eq(technicians.internalUserId, user.userId)
+        });
+        
+        if (techRecord && techRecord.internalUserId !== incidentExistence.assignedToId) {
+            throw createStatusError("Forbidden: You cannot comment on this incident!", 403);
+        }
+    }
+
     /**
      * Creates a comment.
      */
@@ -63,35 +92,7 @@ export class CommentService {
         }
         
         // 2. Role-based Authorization Checks
-        if (user.role === "ClientUser") {
-            if (user.userId !== incidentExistence.reportedById) {
-                throw createStatusError("Forbidden: You cannot comment on this incident!", 403);
-            }
-        } else {
-            // Internal User Checks
-            const internalUserRecord = await db.query.internal_users.findFirst({
-                where: eq(internal_users.userId, user.userId)
-            });
-            
-            if (!internalUserRecord) {
-                throw createStatusError("Forbidden: You cannot comment on this incident!", 403);
-            }
-            
-            // Enforce the isActive check
-            if (!internalUserRecord.isActive) {
-                throw createStatusError("Forbidden: Your account is inactive.", 403);
-            }
-            
-            // Technician Checks
-            const techRecord = await db.query.technicians.findFirst({
-                where: eq(technicians.internalUserId, user.userId)
-            });
-            if (techRecord) {
-                if (techRecord.internalUserId !== incidentExistence.assignedToId) {
-                    throw createStatusError("Forbidden: You cannot comment on this incident!", 403);
-                }
-            }
-        }
+        await this.checkCreateAuthorization(user, incidentExistence);
         
         // 3. Single Database Insert
         const [newComment] = await db.insert(incident_comments).values({
@@ -129,6 +130,43 @@ export class CommentService {
         return newComment;
     }
 
+    private static async checkUpdateAuthorization(user: CurrentUser, incidentExistence: typeof incidents.$inferSelect, commentExistence: typeof incident_comments.$inferSelect) {
+        let isAdmin = false;
+
+        if (user.role === "ClientUser") {
+            if ((user.userId !== incidentExistence.reportedById) || (user.userId !== commentExistence.userId)) {
+                throw createStatusError("Forbidden: You cannot update this comment!", 403);
+            }
+            return false;
+        }
+
+        const internalUserRecord = await db.query.internal_users.findFirst({
+            where: eq(internal_users.userId, user.userId)
+        });
+        
+        if (!internalUserRecord) {
+            throw createStatusError("Forbidden: You cannot update this comment!", 403);
+        }
+        
+        if (!internalUserRecord.isActive) {
+            throw createStatusError("Forbidden: Your account is inactive.", 403);
+        }
+
+        const adminRecord = await db.query.admins.findFirst({
+            where: eq(admins.internalUserId, user.userId)
+        });
+        isAdmin = !!adminRecord;
+        
+        const techRecord = await db.query.technicians.findFirst({
+            where: eq(technicians.internalUserId, user.userId)
+        });
+        if (techRecord && techRecord.internalUserId !== incidentExistence.assignedToId) {
+            throw createStatusError("Forbidden: You cannot update this comment!", 403);
+        }
+
+        return isAdmin;
+    }
+
     /**
      * Updates comment visibility.
      */
@@ -157,42 +195,7 @@ export class CommentService {
         }
         
         // 2. Role-based Authorization Checks
-        let isAdmin = false;
-
-        if (user.role === "ClientUser") {
-            if ((user.userId !== incidentExistence.reportedById) || (user.userId !== commentExistence.userId)) {
-                throw createStatusError("Forbidden: You cannot update this comment!", 403);
-            }
-        } else {
-            // Internal User Checks
-            const internalUserRecord = await db.query.internal_users.findFirst({
-                where: eq(internal_users.userId, user.userId)
-            });
-            
-            if (!internalUserRecord) {
-                throw createStatusError("Forbidden: You cannot update this comment!", 403);
-            }
-            
-            // Enforce the isActive check
-            if (!internalUserRecord.isActive) {
-                throw createStatusError("Forbidden: Your account is inactive.", 403);
-            }
-
-            const adminRecord = await db.query.admins.findFirst({
-                where: eq(admins.internalUserId, user.userId)
-            });
-            isAdmin = !!adminRecord;
-            
-            // Technician Checks
-            const techRecord = await db.query.technicians.findFirst({
-                where: eq(technicians.internalUserId, user.userId)
-            });
-            if (techRecord) {
-                if (techRecord.internalUserId !== incidentExistence.assignedToId) {
-                    throw createStatusError("Forbidden: You cannot update this comment!", 403);
-                }
-            }
-        }
+        const isAdmin = await this.checkUpdateAuthorization(user, incidentExistence, commentExistence);
 
         // 3. Final Security Check
         if (!isAdmin && commentExistence.userId !== user.userId) {

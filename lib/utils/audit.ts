@@ -8,7 +8,7 @@ export async function withAudit(
     handler: () => Promise<Response> | Response
 ) {
     let incidentId: number | undefined;
-    const match = req.url.match(/\/incidents\/(\d+)(?:\/|\?|$)/);
+    const match = /\/incidents\/(\d+)(?:\/|\?|$)/.exec(req.url);
     if (match) {
         incidentId = Number(match[1]);
     }
@@ -19,20 +19,16 @@ export async function withAudit(
         let message = response.ok ? "Success" : "Error";
         let userId = 'user' in req ? (req as AuthenticatedRequest).user?.userId : undefined;
         
-        if (response.ok) {
-            try {
-                 const clone = response.clone();
-                 const json = await clone.json();
-                 if (json.message) message = json.message;
-                 if (json.user && json.user.id) userId = json.user.id;
-            } catch {}
-        } else {
-            try {
-                const clone = response.clone();
-                const json = await clone.json();
+        try {
+            const clone = response.clone();
+            const json = await clone.json();
+            if (response.ok) {
+                if (json.message) message = json.message;
+                if (json.user?.id) userId = json.user.id;
+            } else {
                 message = json.error || message;
-            } catch {}
-        }
+            }
+        } catch {}
 
         await SecurityAudit.createSecurityAudit({
             attemptedEndpoint: endpoint,
