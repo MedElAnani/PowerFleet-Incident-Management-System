@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth";
 import { EventService } from "@/lib/services/event.service";
+import { SecurityAudit } from "@/lib/services/securityaudit.service";
 
 export const GET = withAuth(async (req: AuthenticatedRequest) => {
     try {
@@ -10,7 +11,8 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
             userId: currentUser.userId,
             role: currentUser.role as "ClientUser" | "InternalUser",
         });
-
+        
+        await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'GET /events', message: "Success", statusCode: 200}, req, currentUser.userId)
         return NextResponse.json(data, { status: 200 });
     } catch (error: unknown) {
         console.error("Get incidents route caught an error:", error);

@@ -1,6 +1,7 @@
+import { SecurityAudit } from "@/lib/services/securityaudit.service";
 import { NextResponse } from "next/server";
 
-export async function POST() {
+export async function POST(req: Request) {
     const response = NextResponse.json(
         { success: true, message: "Logged out successfully" }
     )
@@ -13,6 +14,8 @@ export async function POST() {
         maxAge: 0,
         path: "/"
     })
+    
+    await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'POST auth/logout', message: "Logged out successfully", statusCode: 200}, req)
     
     return response
 }

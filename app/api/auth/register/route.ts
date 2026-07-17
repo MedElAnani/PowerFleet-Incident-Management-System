@@ -3,6 +3,7 @@ import { db } from "../../../../db"
 import { clients, users } from '@/db/schema'
 import { eq } from "drizzle-orm"
 import bcrypt from 'bcryptjs'
+import { SecurityAudit } from '@/lib/services/securityaudit.service'
 
 export async function POST(req: Request) {
     try{
@@ -11,6 +12,7 @@ export async function POST(req: Request) {
         
         // 2. Validate if email and password empty
         if(!email || !password || !name || !companyName || !phone) {
+            await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'POST auth/register', message: "Email, Password, Company Name, Phone and Name are required.", statusCode: 400}, req)
             return NextResponse.json(
                 { success: false, error: "Email, Password, Company Name, Phone and Name are required." },
                 { status: 400 }
@@ -22,6 +24,7 @@ export async function POST(req: Request) {
         // Regex Validation
         const emailRegex = /.+@.+\..+/
         if(!emailRegex.test(trimmedEmail)) {
+            await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'POST auth/register', message: "Email Format Not Valid !", statusCode: 400}, req)
             return NextResponse.json(
                 { success: false, error: "Email Format Not Valid !" },
                 { status: 400 }
@@ -36,6 +39,7 @@ export async function POST(req: Request) {
             .limit(1)
             
         if(userExist) {
+            await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'POST auth/register', message: "This Email Already Exists !", statusCode: 401}, req)
             return NextResponse.json(
                 { success: false, error: "This Email Already Exists !" },
                 { status: 401 }
@@ -84,6 +88,7 @@ export async function POST(req: Request) {
             });
         
         // 5. Success Response
+        await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'POST auth/register', message: "Register successfully", statusCode: 201}, req, newUser.id)
         return NextResponse.json(
             { success: true, data: { ...newUser, role: "ClientUser" } },
             { status: 201 }
@@ -91,12 +96,14 @@ export async function POST(req: Request) {
     } catch (err: unknown) {
         const pgErr = err as { code?: string };
         if (pgErr.code === "23505") {
+            await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'POST auth/register', message: "An account associated with this email address already exists.", statusCode: 400}, req)
             return NextResponse.json(
                 { success: false, error: "An account associated with this email address already exists." },
                 { status: 400 }
             )
         }
         
+        await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'POST auth/register', message: "A fatal error occurred during initialization.", statusCode: 500}, req)
         return NextResponse.json(
             { success: false, error: "A fatal error occurred during initialization." },
             { status: 500 }

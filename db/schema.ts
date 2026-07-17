@@ -170,7 +170,7 @@ export const security_audit_events = pgTable("security_audit_events", {
     ipAddress: text("ip_address").notNull(),
     attemptedEndpoint: text("attempted_endpoint").notNull(),
     statusCode: integer("status_code").notNull(),
-    errorMessage: text("error_message"),
+    message: text("message").notNull(),
     incidentTragetId: integer("incident_traget_id"),
     userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { mode: 'date', withTimezone: true }).defaultNow().notNull(),
