@@ -1,0 +1,702 @@
+import { db } from "@/db";
+import { incidents, clients, vehicles, internal_users, technicians, support_managers, users } from "@/db/schema";
+import { eq, and, isNull, ilike, inArray, gte, lte, SQL } from "drizzle-orm";
+import { verifyAdminAccess } from "@/lib/services/role";
+import { auditLogChanges } from "./audit";
+import { resolveUserRole } from "./role";
+import { SlaService, SlaPriority } from "./sla.service";
+import { GetIncidentsFilters } from "./validations/incident";
+
+interface StatusError extends Error {
+    status?: number;
+}
+
+function createStatusError(message: string, status: number): StatusError {
+    const error = new Error(message) as StatusError;
+    error.status = status;
+    return error;
+}
+
+type IncidentType = 
+    | "GPS Device" | "Vehicle" | "Driver" | "Client Complaint" 
+    | "Accident" | "Fuel" | "Mission" | "Maintenance" 
+    | "Payment" | "System Bug" | "Other";
+    
+type IncidentPriority =
+    | "Low" | "Medium" | "High" | "Critical" ;
+    
+type IncidentStatus = 
+    | "New" | "Open" | "In Progress" | "Waiting Client" 
+    | "Waiting Technician" | "Resolved" | "Closed" | "Cancelled" ;
+
+interface CreateIncidentInput {
+    title: string;
+    description: string;
+    type: IncidentType;
+    address: string;
+    vehicleId: number;
+    latitude?: number;
+    longitude?: number;
+}
+
+interface UpdateIncidentInput {
+    title?: string;
+    description?: string;
+    type?: IncidentType;
+    priority?: IncidentPriority;
+    status?: IncidentStatus;
+    assignedToId?: number;
+    message?: string;
+}
+
+interface CurrentUser {
+    userId: number;
+    role: "ClientUser" | "InternalUser" | "Admin" | "Support Manager" | "Technician";
+}
+
+export class IncidentService {
+    /**
+     * Checks if a base user is soft-deleted.
+     */
+    private static async checkUserNotDeleted(userId: number) {
+        const userRecord = await db.query.users.findFirst({
+            where: and(eq(users.id, userId), isNull(users.deletedAt))
+        });
+        if (!userRecord) {
+            throw createStatusError("Forbidden: Account is deleted or inactive.", 403);
+        }
+        return userRecord;
+    }
+
+    /**
+     * Checks if an internal user is active.
+     */
+    private static async checkInternalUserActive(userId: number) {
+        const internalRecord = await db.query.internal_users.findFirst({
+            where: eq(internal_users.userId, userId)
+        });
+        if (!internalRecord) {
+            throw createStatusError("Forbidden: Internal user profile not found.", 403);
+        }
+        if (!internalRecord.isActive) {
+            throw createStatusError("Forbidden: Your account is inactive and cannot make changes.", 403);
+        }
+        return internalRecord;
+    }
+
+    /**
+     * Creates a new incident ticket.
+     */
+    static async createTicket(data: CreateIncidentInput, authenticatedUserId: number) {
+        const { title, description, type, address, vehicleId, latitude, longitude } = data;
+
+        if (!title || !description || !type || !address || !vehicleId) {
+            throw createStatusError("Missing required fields", 400);
+        }
+
+        // 1. Enforce user soft-deletion check
+        await this.checkUserNotDeleted(authenticatedUserId);
+
+        // 2. Fetch Client Profile
+        const clientRecord = await db.query.clients.findFirst({
+            where: eq(clients.userId, authenticatedUserId)
+        });
+
+        if (!clientRecord) {
+            throw createStatusError("No client profile associated with this user account.", 404);
+        }
+
+        // 3. Fetch Vehicle Record
+        const vehicle = await db.query.vehicles.findFirst({
+            where: eq(vehicles.id, vehicleId)
+        });
+
+        if (!vehicle) {
+            throw createStatusError("Vehicle not found", 404);
+        }
+
+        if (vehicle.clientId !== clientRecord.userId) {
+            throw createStatusError("You can only report incidents for your own vehicles.", 403);
+        }
+
+        const baseTime = Date.now();
+        const { responseDueAt, resolutionDueAt } = SlaService.calculateCreationDates("Medium", new Date(baseTime));
+
+        const [newIncident] = await db.insert(incidents).values({
+            title,
+            description,
+            type,
+            address,
+            vehicleId,
+            latitude,
+            longitude,
+            clientId: clientRecord.userId,
+            reportedById: authenticatedUserId,
+            responseDueAt,
+            resolutionDueAt,
+            slaStatus: "Healthy"
+        }).returning();
+        
+        const incidentId = newIncident.id;
+        
+        if (newIncident) {
+            await auditLogChanges({
+                incidentId,
+                userId: authenticatedUserId,
+                logType: 'create',
+                newRecord: newIncident
+            });
+            await SlaService.calculateSLA(incidentId);
+        }
+
+        const refreshedIncident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        return refreshedIncident || newIncident;
+    }
+
+    /**
+     * Helper to build dynamic Drizzle WHERE clauses based on filters
+     */
+    private static buildIncidentFilters(filters: GetIncidentsFilters, isAdmin: boolean = false) {
+        const conditions: (SQL<unknown> | undefined)[] = [];
+
+        if (!isAdmin) {
+            conditions.push(isNull(incidents.deletedAt));
+        }
+
+        if (filters.search) {
+            const searchId = Number.parseInt(filters.search);
+            if (!Number.isNaN(searchId)) {
+                conditions.push(eq(incidents.id, searchId));
+            } else {
+                conditions.push(ilike(incidents.title, `%${filters.search}%`));
+            }
+        }
+
+        if (filters.vehicleId) conditions.push(eq(incidents.vehicleId, filters.vehicleId));
+        if (filters.clientId) conditions.push(eq(incidents.clientId, filters.clientId));
+        if (filters.assignedToId) conditions.push(eq(incidents.assignedToId, filters.assignedToId));
+
+        if (filters.status?.length) {
+            conditions.push(inArray(incidents.status, filters.status as (typeof incidents.$inferSelect)["status"][]));
+        }
+        if (filters.priority?.length) {
+            conditions.push(inArray(incidents.priority, filters.priority as (typeof incidents.$inferSelect)["priority"][]));
+        }
+        if (filters.type?.length) {
+            conditions.push(inArray(incidents.type, filters.type as (typeof incidents.$inferSelect)["type"][]));
+        }
+        if (filters.slaStatus?.length) {
+            conditions.push(inArray(incidents.slaStatus, filters.slaStatus as NonNullable<(typeof incidents.$inferSelect)["slaStatus"]>[]));
+        }
+
+        if (filters.dateFrom) conditions.push(gte(incidents.createdAt, filters.dateFrom));
+        if (filters.dateTo) conditions.push(lte(incidents.createdAt, filters.dateTo));
+
+        return conditions.length > 0 ? and(...conditions.filter(Boolean)) : undefined;
+    }
+
+    /**
+     * Retrieves incidents visible to the user.
+     */
+    static async getIncidents(user: CurrentUser, filters: GetIncidentsFilters = {}) {
+        // Enforce user soft-deletion check
+        await this.checkUserNotDeleted(user.userId);
+
+        let isAdmin = false;
+        let resolvedRole = user.role as string;
+        if (user.role !== "ClientUser") {
+            resolvedRole = await resolveUserRole(user.userId) || user.role;
+            if (resolvedRole === "Admin") isAdmin = true;
+        }
+
+        const sharedRelations = {
+            vehicle: isAdmin ? true : {
+                where: isNull(vehicles.deletedAt)
+            },
+            reportedBy: {
+                with: {
+                    user: { columns: { password: false } }
+                }
+            },
+            assignedTo: {
+                with: {
+                    internalUser: {
+                        with: { user: { columns: { password: false } } }
+                    }
+                }
+            },
+        };
+
+        if (user.role === "ClientUser") {
+            // Enforce RBAC: Clients cannot filter by these fields
+            delete filters.slaStatus
+            delete filters.assignedToId
+            
+            const clientRecord = await db.query.clients.findFirst({
+                where: eq(clients.userId, user.userId),
+            });
+
+            if (!clientRecord) return [];
+            
+            // Force the client ID so they only see their own
+            filters.clientId = user.userId;
+        } else {
+            // For internal users, verify activity status
+            const internalProfile = await this.checkInternalUserActive(user.userId);
+
+            if (resolvedRole === "Technician") {
+                const techRecord = await db.query.technicians.findFirst({
+                    where: eq(technicians.internalUserId, internalProfile.userId),
+                });
+
+                if (!techRecord) return [];
+                
+                // Force assignedToId so they only see their assigned tickets
+                filters.assignedToId = techRecord.internalUserId;
+            }
+        }
+
+        const finalWhere = this.buildIncidentFilters(filters, isAdmin);
+
+        return await db.query.incidents.findMany({
+            where: finalWhere,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            with: sharedRelations as any,
+            orderBy: (incidents, { desc }) => [desc(incidents.createdAt)],
+        });
+    }
+
+    /**
+     * Changes the status of an incident ticket.
+     */
+    static async changeStatus(incidentId: number, newStatus: IncidentStatus, userId: number, message: string) {
+        if (!message) {
+            throw createStatusError("Message For This Action Is Required", 400);
+        }
+
+        // 1. Check user soft-deletion
+        await this.checkUserNotDeleted(userId);
+
+        const incident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        if (!incident) {
+            throw createStatusError("Incident Not Found!", 404);
+        }
+
+        const resolvedRole = await resolveUserRole(userId);
+
+        if (resolvedRole === "ClientUser") {
+            throw createStatusError("Forbidden: Clients cannot directly change incident status.", 403);
+        }
+
+        // 2. Check internal user active
+        await this.checkInternalUserActive(userId);
+
+        if (resolvedRole === "Technician") {
+            const techRecord = await db.query.technicians.findFirst({
+                where: eq(technicians.internalUserId, userId)
+            });
+
+            if (!techRecord || incident.assignedToId !== techRecord.internalUserId) {
+                throw createStatusError("Forbidden: This incident is not assigned to you.", 403);
+            }
+
+            if (newStatus === "Closed" || newStatus === "Cancelled") {
+                throw createStatusError("Forbidden: Technicians cannot close or cancel an incident.", 403);
+            }
+        }
+
+        if (resolvedRole === "Support Manager") {
+            if (newStatus === "Closed" || newStatus === "Cancelled") {
+                throw createStatusError("Forbidden: Support Managers cannot close or cancel an incident.", 403);
+            }
+        }
+
+        const [updatedIncident] = await db
+            .update(incidents)
+            .set({
+                status: newStatus,
+                ...(newStatus === "Resolved" && { resolvedAt: new Date() }),
+                updatedAt: new Date(),
+            })
+            .where(eq(incidents.id, incidentId))
+            .returning();
+
+        await auditLogChanges({
+            incidentId,
+            userId,
+            logType: 'update',
+            oldRecord: incident,
+            newRecord: updatedIncident,
+            message
+        });
+
+        await SlaService.calculateSLA(incidentId);
+
+        const refreshedIncident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        return refreshedIncident || updatedIncident;
+    }
+
+    /**
+     * Assigns an incident to a technician.
+     */
+    static async assignTo(incidentId: number, technicianUserId: number, managerUserId: number, message: string) {
+        if (!message) {
+            throw createStatusError("Message For This Action Is Required", 400);
+        }
+
+        // 1. Check manager soft-deletion & activity
+        await this.checkUserNotDeleted(managerUserId);
+        await this.checkInternalUserActive(managerUserId);
+
+        // 2. Check technician soft-deletion & activity
+        await this.checkUserNotDeleted(technicianUserId);
+        await this.checkInternalUserActive(technicianUserId);
+
+        // 3. Check technician availability
+        const techRecord = await db.query.technicians.findFirst({
+            where: eq(technicians.internalUserId, technicianUserId)
+        });
+
+        if (!techRecord) {
+            throw createStatusError("Target technician user profile not found.", 404);
+        }
+
+        if (!techRecord.isAvailable) {
+            throw createStatusError("Forbidden: Selected technician is currently unavailable.", 403);
+        }
+
+        const incident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        if (!incident) {
+            throw createStatusError("Incident Not Found!", 404);
+        }
+
+        const resolvedRole = await resolveUserRole(managerUserId);
+
+        if (resolvedRole === "Support Manager") {
+            const smRecord = await db.query.support_managers.findFirst({
+                where: eq(support_managers.internalUserId, managerUserId)
+            });
+            if (!smRecord || !smRecord.canAssign) {
+                throw createStatusError("Forbidden: You do not have permission to assign incidents.", 403);
+            }
+        } else if (resolvedRole !== "Admin") {
+            throw createStatusError("Forbidden: Only Support Managers or Admins can assign incidents.", 403);
+        }
+
+        const [updatedIncident] = await db
+            .update(incidents)
+            .set({
+                assignedToId: technicianUserId,
+                updatedAt: new Date(),
+            })
+            .where(eq(incidents.id, incidentId))
+            .returning();
+
+        await auditLogChanges({
+            incidentId,
+            userId: managerUserId,
+            logType: 'update',
+            oldRecord: incident,
+            newRecord: updatedIncident,
+            message
+        });
+
+        await SlaService.calculateSLA(incidentId);
+
+        const refreshedIncident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        return refreshedIncident || updatedIncident;
+    }
+
+    /**
+     * Closes an incident ticket.
+     */
+    static async closeIncident(incidentId: number, userId: number, message: string, resolutionNote?: string) {
+        if (!message) {
+            throw createStatusError("Message For This Action Is Required", 400);
+        }
+
+        // 1. Check user soft-deletion & activity
+        await this.checkUserNotDeleted(userId);
+        await this.checkInternalUserActive(userId);
+
+        const resolvedRole = await resolveUserRole(userId);
+
+        if (resolvedRole !== "Admin") {
+            throw createStatusError("Forbidden: Only Admins can close or cancel an incident.", 403);
+        }
+
+        const incident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        if (!incident) {
+            throw createStatusError("Incident Not Found!", 404);
+        }
+
+        const [updatedIncident] = await db
+            .update(incidents)
+            .set({
+                status: "Closed",
+                closedAt: new Date(),
+                ...(!incident.resolvedAt && { resolvedAt: new Date() }),
+                ...(resolutionNote !== undefined && { resolutionNote }),
+                updatedAt: new Date(),
+            })
+            .where(eq(incidents.id, incidentId))
+            .returning();
+
+        await auditLogChanges({
+            incidentId,
+            userId,
+            logType: 'update',
+            oldRecord: incident,
+            newRecord: updatedIncident,
+            message
+        });
+
+        await SlaService.calculateSLA(incidentId);
+
+        const refreshedIncident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        return refreshedIncident || updatedIncident;
+    }
+
+    private static async updateClientIncident(incidentId: number, authenticatedUserId: number, data: UpdateIncidentInput, incident: typeof incidents.$inferSelect) {
+        const clientRecord = await db.query.clients.findFirst({
+            where: eq(clients.userId, authenticatedUserId),
+        });
+
+        if (!clientRecord || incident.clientId !== clientRecord.userId) {
+            throw createStatusError("Forbidden: You cannot access this incident!", 403);
+        }
+
+        const [updatedIncident] = await db
+            .update(incidents)
+            .set({
+                title: data.title,
+                description: data.description,
+                type: data.type,
+                updatedAt: new Date(),
+            })
+            .where(eq(incidents.id, incidentId))
+            .returning();
+
+        return updatedIncident;
+    }
+
+    private static async updateTechnicianIncident(incidentId: number, authenticatedUserId: number, data: UpdateIncidentInput, incident: typeof incidents.$inferSelect) {
+        const techRecord = await db.query.technicians.findFirst({
+            where: eq(technicians.internalUserId, authenticatedUserId)
+        });
+
+        if (!techRecord || incident.assignedToId !== techRecord.internalUserId) {
+            throw createStatusError("Forbidden: This incident is not assigned to you.", 403);
+        }
+
+        if (data.status === "Closed" || data.status === "Cancelled") {
+            throw createStatusError("Forbidden: Technicians cannot close or cancel an incident.", 403);
+        }
+        
+        if (!data.message) {
+            throw createStatusError("Message For This Action Is Required", 400);
+        }
+
+        let firstResponseAt = incident.firstResponseAt;
+        let resolutionDueAt = incident.resolutionDueAt;
+        if (!firstResponseAt) {
+            const calculated = SlaService.calculateFirstResponseDates(
+                incident.priority as SlaPriority,
+                new Date()
+            );
+            firstResponseAt = calculated.firstResponseAt;
+            resolutionDueAt = calculated.resolutionDueAt;
+        }
+
+        const [updatedIncident] = await db
+            .update(incidents)
+            .set({
+                ...(data.status !== undefined && { status: data.status }),
+                firstResponseAt,
+                resolutionDueAt,
+                ...(data.status === "Resolved" && { resolvedAt: new Date() }),
+                updatedAt: new Date(),
+            })
+            .where(eq(incidents.id, incidentId))
+            .returning();
+
+        await auditLogChanges({
+            incidentId,
+            userId: authenticatedUserId,
+            logType: 'update',
+            oldRecord: incident,
+            newRecord: updatedIncident,
+            message: data.message
+        });
+
+        await SlaService.calculateSLA(incidentId);
+
+        const refreshedIncident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        return refreshedIncident || updatedIncident;
+    }
+
+    private static async updateAdminManagerIncident(incidentId: number, authenticatedUserId: number, data: UpdateIncidentInput, incident: typeof incidents.$inferSelect, resolvedRole: string) {
+        if (data.status === "Closed" || data.status === "Cancelled") {
+            if (resolvedRole !== "Admin") {
+                throw createStatusError("Forbidden: Support Managers cannot close or cancel an incident.", 403);
+            }
+        }
+        
+        if (data.assignedToId !== undefined) {
+            await this.checkUserNotDeleted(data.assignedToId);
+            await this.checkInternalUserActive(data.assignedToId);
+            
+            const techProfile = await db.query.technicians.findFirst({
+                where: eq(technicians.internalUserId, data.assignedToId)
+            });
+            if (!techProfile) {
+                throw createStatusError("Target technician user profile not found.", 404);
+            }
+            if (!techProfile.isAvailable) {
+                throw createStatusError("Forbidden: Selected technician is currently unavailable.", 403);
+            }
+
+            if (resolvedRole === "Support Manager") {
+                const smRecord = await db.query.support_managers.findFirst({
+                    where: eq(support_managers.internalUserId, authenticatedUserId)
+                });
+                if (!smRecord?.canAssign) {
+                    throw createStatusError("Forbidden: You do not have permission to assign incidents.", 403);
+                }
+            }
+        }
+        
+        if (!data.message) {
+            throw createStatusError("Message For This Action Is Required", 400);
+        }
+
+        let responseDueAt = incident.responseDueAt;
+        let resolutionDueAt = incident.resolutionDueAt;
+        const firstResponseAt = incident.firstResponseAt;
+
+        if (data.priority !== undefined && data.priority !== incident.priority) {
+            const baseTime = incident.createdAt ? new Date(incident.createdAt) : new Date();
+            const calculated = SlaService.calculatePriorityChangeDates(
+                data.priority,
+                baseTime,
+                firstResponseAt
+            );
+            responseDueAt = calculated.responseDueAt;
+            resolutionDueAt = calculated.resolutionDueAt;
+        }
+
+        const [updatedIncident] = await db
+            .update(incidents)
+            .set({
+                ...(data.priority !== undefined && { priority: data.priority }),
+                ...(data.status !== undefined && { status: data.status }),
+                ...(data.assignedToId !== undefined && { assignedToId: data.assignedToId }),
+                responseDueAt,
+                resolutionDueAt,
+                ...(data.status === "Resolved" && { resolvedAt: new Date() }),
+                ...(data.status === "Closed" && { closedAt: new Date(), ...(!incident.resolvedAt && { resolvedAt: new Date() }) }),
+                updatedAt: new Date(),
+            })
+            .where(eq(incidents.id, incidentId))
+            .returning();
+
+        await auditLogChanges({
+            incidentId,
+            userId: authenticatedUserId,
+            logType: 'update',
+            oldRecord: incident,
+            newRecord: updatedIncident,
+            message: data.message
+        });
+
+        await SlaService.calculateSLA(incidentId);
+
+        const refreshedIncident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        return refreshedIncident || updatedIncident;
+    }
+
+    /**
+     * Unified incident update service routing (backward compatible dispatcher for API PATCH routes)
+     */
+    static async updateIncident(data: UpdateIncidentInput, authenticatedUserId: number, incidentId: number) {
+        // 1. Enforce user soft-deletion check
+        await this.checkUserNotDeleted(authenticatedUserId);
+
+        const incident = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        if (!incident) {
+            throw createStatusError("Incident Not Found!", 404);
+        }
+
+        const resolvedRole = await resolveUserRole(authenticatedUserId);
+
+        if (resolvedRole === "ClientUser") {
+            return this.updateClientIncident(incidentId, authenticatedUserId, data, incident);
+        }
+
+        await this.checkInternalUserActive(authenticatedUserId);
+
+        if (resolvedRole === "Technician") {
+            return this.updateTechnicianIncident(incidentId, authenticatedUserId, data, incident);
+        }
+
+        if (resolvedRole === "Admin" || resolvedRole === "Support Manager") {
+            return this.updateAdminManagerIncident(incidentId, authenticatedUserId, data, incident, resolvedRole);
+        }
+
+        throw createStatusError("Forbidden: Unrecognized role.", 403);
+    }
+
+    /**
+     * Soft-deletes an incident (Admin only)
+     */
+    static async deleteIncident(incidentId: number, authenticatedUserId: number) {
+        await this.checkUserNotDeleted(authenticatedUserId);
+        
+        await verifyAdminAccess(authenticatedUserId);
+
+        const incidentRecord = await db.query.incidents.findFirst({
+            where: eq(incidents.id, incidentId)
+        });
+
+        if (incidentRecord?.deletedAt !== null) {
+            throw createStatusError("Incident Not Found!", 404);
+        }
+
+        const [deletedIncident] = await db.update(incidents)
+            .set({ deletedAt: new Date(), updatedAt: new Date() })
+            .where(eq(incidents.id, incidentId))
+            .returning();
+
+        return deletedIncident;
+    }
+}
