@@ -1,7 +1,7 @@
 import { db } from "@/db"
 import { verifyAdminAccess } from "@/lib/services/role";
-import { and, eq, isNull } from "drizzle-orm";
-import { security_audit_events, users } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { security_audit_events } from "@/db/schema";
 
 interface CreateSecurityAuditInput {
     attemptedEndpoint: string;
@@ -10,35 +10,7 @@ interface CreateSecurityAuditInput {
     incidentTragetId?: number;
 }
 
-interface CurrentUser {
-    userId: number;
-    role: "ClientUser" | "InternalUser" | "Admin" | "Support Manager" | "Technician";
-}
-
-interface StatusError extends Error {
-    status?: number;
-}
-
-function createStatusError(message: string, status: number): StatusError {
-    const error = new Error(message) as StatusError;
-    error.status = status;
-    return error;
-}
-
 export class SecurityAudit {
-    /**
-     * Checks if a base user is soft-deleted.
-     */
-    private static async checkUserNotDeleted(userId: number) {
-        const userRecord = await db.query.users.findFirst({
-            where: and(eq(users.id, userId), isNull(users.deletedAt))
-        });
-        if (!userRecord) {
-            throw createStatusError("Forbidden: Account is deleted or inactive.", 403);
-        }
-        return userRecord;
-    }
-    
     /**
      * Create a security audit
      */

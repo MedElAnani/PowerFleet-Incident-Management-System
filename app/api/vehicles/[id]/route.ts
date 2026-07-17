@@ -4,15 +4,15 @@ import { db } from "@/db"
 import { incidents, vehicles, clients } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { VehicleService } from "@/lib/services/vehicle.service";
-import { SecurityAudit } from "@/lib/services/securityaudit.service";
+import { withAudit } from "@/lib/utils/audit";
+
 export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
+    return withAudit(req, 'GET /vehicles/[id]', async () => {
         const { id } = await params;
         const vehicleId = Number(id);
         const currentUser = req.user!;
         
         if (Number.isNaN(vehicleId)) {
-            await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'GET /vehicles/[id]', message: "Invalid vehicle ID", statusCode: 400}, req, currentUser.userId);
             return NextResponse.json(
                 { error: "Invalid vehicle ID" },
                 { status: 400 }
@@ -37,7 +37,6 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         });
         
         if (!vehicle) {
-            await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'GET /vehicles/[id]', message: "Vehicle Not Found!", statusCode: 404}, req, currentUser.userId);
             return NextResponse.json(
                 { error: "Vehicle Not Found!" },
                 { status: 404 }
@@ -51,7 +50,6 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
             });
             
             if (!clientRecord || vehicle.clientId !== clientRecord.userId) {
-                await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'GET /vehicles/[id]', message: "Forbidden: You cannot access this vehicle!", statusCode: 403}, req, currentUser.userId);
                 return NextResponse.json(
                     { error: "Forbidden: You cannot access this vehicle!" }, 
                     { status: 403 }
@@ -60,42 +58,22 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         }
         
         // Returns the clear incident layout safely
-        await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'GET /vehicles/[id]', message: "Success", statusCode: 200}, req, currentUser.userId);
         return NextResponse.json(vehicle);
-
-    } catch (error: unknown) {
-        const err = error as { status?: number; message?: string };
-        if (err.status) {
-            await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'GET /vehicles/[id]', message: err.message || "Error", statusCode: err.status}, req, req.user?.userId);
-            return NextResponse.json({ error: err.message }, { status: err.status });
-        }
-        await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'GET /vehicles/[id]', message: err.message || "Internal Server Error", statusCode: 500}, req, req.user?.userId);
-        return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
-    }
+    });
 });
 
 export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
+    return withAudit(req, 'DELETE /vehicles/[id]', async () => {
         const { id } = await params;
         const vehicleId = Number(id);
         const currentUser = req.user!;
         
         if (Number.isNaN(vehicleId)) {
-            await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'DELETE /vehicles/[id]', message: "Invalid vehicle ID", statusCode: 400}, req, currentUser.userId);
             return NextResponse.json({ error: "Invalid vehicle ID" }, { status: 400 });
         }
         
         await VehicleService.deleteVehicle(vehicleId, currentUser.userId);
         
-        await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'DELETE /vehicles/[id]', message: "Vehicle deleted successfully.", statusCode: 200}, req, currentUser.userId);
         return NextResponse.json({ success: true, message: "Vehicle deleted successfully." });
-    } catch (error: unknown) {
-        const err = error as { status?: number; message?: string };
-        if (err.status) {
-            await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'DELETE /vehicles/[id]', message: err.message || "Error", statusCode: err.status}, req, req.user?.userId);
-            return NextResponse.json({ error: err.message }, { status: err.status });
-        }
-        await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'DELETE /vehicles/[id]', message: err.message || "Internal Server Error", statusCode: 500}, req, req.user?.userId);
-        return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
-    }
+    });
 }, "Admin");

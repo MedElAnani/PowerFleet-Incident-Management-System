@@ -5,15 +5,14 @@ import { eq } from "drizzle-orm"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { resolveUserRole } from "@/lib/services/role"
-import { SecurityAudit } from "@/lib/services/securityaudit.service";
+import { withAudit } from "@/lib/utils/audit";
 
 export async function POST(req: Request) {
-    try{
+    return withAudit(req, 'POST auth/login', async () => {
         const { email, password } = await req.json()
         
         // 1. Check if email or password are empty
         if(!email || !password) {
-            await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'POST auth/login', message: "Email and Password are required !", statusCode: 400}, req)
             return NextResponse.json(
                 { success: false, error: "Email and Password are required !" },
                 { status: 400 }
@@ -28,7 +27,6 @@ export async function POST(req: Request) {
             .limit(1)
             
         if(!user) {
-            await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'POST auth/login', message: "Email Invalid !", statusCode: 401}, req)
             return NextResponse.json(
                 { success: false, error: "Email Invalid !" },
                 { status: 401 }
@@ -38,7 +36,6 @@ export async function POST(req: Request) {
         // 3. Compare Cryptographic Hashes
         const isPasswordValid = await bcrypt.compare(password, user.password)
         if(!isPasswordValid) {
-            await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'POST auth/login', message: "Password Invalid !", statusCode: 401}, req)
             return NextResponse.json(
                 { success: false, error: "Password Invalid !" },
                 { status: 401 }
@@ -48,7 +45,6 @@ export async function POST(req: Request) {
         // 4. Resolve Dynamic Role (for user response profile payload only)
         const role = await resolveUserRole(user.id);
         if(!role) {
-            await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'POST auth/login', message: "Access Denied: User type could not be resolved", statusCode: 403}, req)
             return NextResponse.json(
                 { success: false, error: "Access Denied: User type could not be resolved." },
                 { status: 403 }
@@ -65,7 +61,6 @@ export async function POST(req: Request) {
         )
         
         // 6. Create a Success Response
-        await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'POST auth/login', message: "Authentication successful.", statusCode: 200}, req, user.id)
         const response = NextResponse.json(
             { success: true, message: "Authentication successful.", user: { 
                     id: user.id,
@@ -86,12 +81,5 @@ export async function POST(req: Request) {
         })
         
         return response
-        
-    }catch (error) {
-        await SecurityAudit.createSecurityAudit({attemptedEndpoint: 'POST auth/login', message: "An error occurred during authentication processing.", statusCode: 500}, req)
-        return NextResponse.json(
-            { success: false, error: "An error occurred during authentication processing.", err: error },
-            { status: 500 }
-        )
-    }
+    });
 }

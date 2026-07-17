@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { POST as registerPOST } from "@/app/api/auth/register/route";
 import { POST as loginPOST } from "@/app/api/auth/login/route";
 import { db } from "@/db";
@@ -75,7 +75,7 @@ describe("Auth Endpoints", () => {
         expect(data.user.email).toBe(testEmail);
         expect(data.user.token).toBeDefined();
 
-        const cookie = res.cookies.get("auth_token");
+        const cookie = (res as NextResponse).cookies.get("auth_token");
         expect(cookie).toBeDefined();
         expect(cookie?.value).toBe(data.user.token);
     });
