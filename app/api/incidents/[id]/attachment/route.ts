@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth";
 import { AttachmentService } from '@/lib/services/attachment.service';
+import { withAudit } from '@/lib/utils/audit';
 
 export const POST = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
+    return withAudit(req, 'POST /incidents/[id]/attachment', async () => {
         const { id } = await params;
         const incidentId = Number(id);
+        const currentUser = req.user!;
         
         if (Number.isNaN(incidentId)) {
             return NextResponse.json(
@@ -14,8 +16,6 @@ export const POST = withAuth(async (req: AuthenticatedRequest, { params }: { par
             );
         }
 
-        const currentUser = req.user!;
-        
         let body;
         try {
             body = await req.json();
@@ -29,17 +29,5 @@ export const POST = withAuth(async (req: AuthenticatedRequest, { params }: { par
         }, incidentId);
 
         return NextResponse.json(newAttachment, { status: 201 });
-    } catch (error: unknown) {
-        console.error("Create attachment route caught an error:", error);
-        const err = error as { status?: number; message?: string };
-
-        if (err.status) {
-            return NextResponse.json({ error: err.message }, { status: err.status });
-        }
-
-        return NextResponse.json(
-            { error: "Internal Server Error", details: err.message },
-            { status: 500 }
-        );
-    }
+    });
 });

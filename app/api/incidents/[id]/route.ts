@@ -5,8 +5,10 @@ import { incidents, clients, technicians, incident_comments, incident_attachment
 import { eq, and, isNull } from "drizzle-orm";
 import { IncidentService } from "@/lib/services/incident.service";
 
+import { withAudit } from "@/lib/utils/audit";
+
 export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
+    return withAudit(req, 'GET /incidents/[id]', async () => {
         const { id } = await params;
         const incidentId = Number(id);
         const currentUser = req.user!;
@@ -134,18 +136,11 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         };
         
         return NextResponse.json(incidentWithFilteredComments);
-
-    } catch (error: unknown) {
-        const err = error as Error;
-        return NextResponse.json(
-            { error: err.message },
-            { status: 500 }
-        );
-    }
+    });
 });
 
 export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try{
+    return withAudit(req, 'PATCH /incidents/[id]', async () => {
         const { id } = await params;
         const incidentId = Number(id);
         const currentUser = req.user!;
@@ -170,24 +165,11 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { pa
             newUpdatedIncident,
             { status: 200 }
         )
-        
-    } catch (error: unknown) {
-        console.error("Incident update route caught an error:", error);
-        const err = error as { status?: number; message?: string };
-
-        if (err.status) {
-            return NextResponse.json({ error: err.message }, { status: err.status });
-        }
-
-        return NextResponse.json(
-            { error: "Internal Server Error", details: err.message },
-            { status: 500 }
-        );
-    }
+    });
 } )
 
 export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
+    return withAudit(req, 'DELETE /incidents/[id]', async () => {
         const { id } = await params;
         const incidentId = Number(id);
         const currentUser = req.user!;
@@ -199,11 +181,5 @@ export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { p
         await IncidentService.deleteIncident(incidentId, currentUser.userId);
         
         return NextResponse.json({ success: true, message: "Incident deleted successfully." });
-    } catch (error: unknown) {
-        const err = error as { status?: number; message?: string };
-        if (err.status) {
-            return NextResponse.json({ error: err.message }, { status: err.status });
-        }
-        return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
-    }
+    });
 }, "Admin");

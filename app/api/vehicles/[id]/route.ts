@@ -4,9 +4,10 @@ import { db } from "@/db"
 import { incidents, vehicles, clients } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { VehicleService } from "@/lib/services/vehicle.service";
+import { withAudit } from "@/lib/utils/audit";
 
 export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
+    return withAudit(req, 'GET /vehicles/[id]', async () => {
         const { id } = await params;
         const vehicleId = Number(id);
         const currentUser = req.user!;
@@ -58,18 +59,11 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         
         // Returns the clear incident layout safely
         return NextResponse.json(vehicle);
-
-    } catch (error: unknown) {
-        const err = error as { status?: number; message?: string };
-        if (err.status) {
-            return NextResponse.json({ error: err.message }, { status: err.status });
-        }
-        return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
-    }
+    });
 });
 
 export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
+    return withAudit(req, 'DELETE /vehicles/[id]', async () => {
         const { id } = await params;
         const vehicleId = Number(id);
         const currentUser = req.user!;
@@ -81,11 +75,5 @@ export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { p
         await VehicleService.deleteVehicle(vehicleId, currentUser.userId);
         
         return NextResponse.json({ success: true, message: "Vehicle deleted successfully." });
-    } catch (error: unknown) {
-        const err = error as { status?: number; message?: string };
-        if (err.status) {
-            return NextResponse.json({ error: err.message }, { status: err.status });
-        }
-        return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
-    }
+    });
 }, "Admin");

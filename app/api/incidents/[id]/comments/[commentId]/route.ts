@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth";
 import { CommentService } from "@/lib/services/comment.service";
+import { withAudit } from "@/lib/utils/audit";
 
 export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string, commentId: string }> }) => {
-    try {
+    return withAudit(req, 'PATCH /incidents/[id]/comments/[commentId]', async () => {
         const { id, commentId } = await params;
         const incidentId = Number(id);
         const targetCommentId = Number(commentId);
@@ -45,23 +46,11 @@ export const PATCH = withAuth(async (req: AuthenticatedRequest, { params }: { pa
         }, incidentId, targetCommentId);
 
         return NextResponse.json(upComment, { status: 200 });
-    } catch (error: unknown) {
-        console.error("Update comment visibility route caught an error:", error);
-        const err = error as { status?: number; message?: string };
-
-        if (err.status) {
-            return NextResponse.json({ error: err.message }, { status: err.status });
-        }
-
-        return NextResponse.json(
-            { error: "Internal Server Error", details: err.message },
-            { status: 500 }
-        );
-    }
+    });
 });
 
 export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string, commentId: string }> }) => {
-    try {
+    return withAudit(req, 'DELETE /incidents/[id]/comments/[commentId]', async () => {
         const { commentId } = await params;
         const targetCommentId = Number(commentId);
         const currentUser = req.user!;
@@ -73,11 +62,5 @@ export const DELETE = withAuth(async (req: AuthenticatedRequest, { params }: { p
         await CommentService.deleteComment(targetCommentId, currentUser.userId);
         
         return NextResponse.json({ success: true, message: "Comment deleted successfully." });
-    } catch (error: unknown) {
-        const err = error as { status?: number; message?: string };
-        if (err.status) {
-            return NextResponse.json({ error: err.message }, { status: err.status });
-        }
-        return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
-    }
+    });
 });

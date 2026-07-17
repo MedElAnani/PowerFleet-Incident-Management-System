@@ -5,9 +5,10 @@ import { eq } from "drizzle-orm"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { resolveUserRole } from "@/lib/services/role"
+import { withAudit } from "@/lib/utils/audit";
 
 export async function POST(req: Request) {
-    try{
+    return withAudit(req, 'POST auth/login', async () => {
         const { email, password } = await req.json()
         
         // 1. Check if email or password are empty
@@ -80,11 +81,5 @@ export async function POST(req: Request) {
         })
         
         return response
-        
-    }catch (error) {
-        return NextResponse.json(
-            { success: false, error: "An error occurred during authentication processing.", err: error },
-            { status: 500 }
-        )
-    }
+    });
 }

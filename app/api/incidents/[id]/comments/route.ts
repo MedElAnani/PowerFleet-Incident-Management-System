@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth";
 import { CommentService } from "@/lib/services/comment.service";
+import { withAudit } from "@/lib/utils/audit";
 
 export const POST = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
+    return withAudit(req, 'POST /incidents/[id]/comments', async () => {
         const { id } = await params;
         const incidentId = Number(id);
         if (Number.isNaN(incidentId)) {
@@ -21,12 +22,5 @@ export const POST = withAuth(async (req: AuthenticatedRequest, { params }: { par
         }, incidentId);
 
         return NextResponse.json(newComment, { status: 201 });
-    } catch (error: unknown) {
-        console.error("Create comment error:", error);
-        const err = error as Error & { status?: number };
-        return NextResponse.json(
-            { error: err.message || "Internal Server Error" },
-            { status: err.status || 500 }
-        );
-    }
+    });
 });

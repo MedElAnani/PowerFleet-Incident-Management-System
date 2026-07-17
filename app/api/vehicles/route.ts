@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { withAuth, AuthenticatedRequest } from "@/middleware/auth";
 import { VehicleService } from "@/lib/services/vehicle.service";
+import { withAudit } from "@/lib/utils/audit";
 
 export const POST = withAuth(async (req: AuthenticatedRequest) => {
-    try{
+    return withAudit(req, 'POST /vehicles', async () => {
         const currentUser = req.user!;
         let body;
         try {
@@ -18,17 +19,5 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
             newVehicle,
             { status: 201 }
         )
-    } catch (error: unknown) {
-        console.error("Vehicle creation route caught an error:", error);
-        const err = error as { status?: number; message?: string };
-
-        if (err.status) {
-            return NextResponse.json({ error: err.message }, { status: err.status });
-        }
-
-        return NextResponse.json(
-            { error: "Internal Server Error", details: err.message },
-            { status: 500 }
-        );
-    }
+    });
 }, "Admin")

@@ -3,9 +3,10 @@ import { withAuth, AuthenticatedRequest } from "@/middleware/auth";
 import { db } from "@/db";
 import { incident_events } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { withAudit } from "@/lib/utils/audit";
 
 export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) => {
-    try {
+    return withAudit(req, 'GET /incidents/[id]/events', async () => {
         const { id } = await params;
         const incidentId = Number(id);
         
@@ -31,12 +32,5 @@ export const GET = withAuth(async (req: AuthenticatedRequest, { params }: { para
         }
 
         return NextResponse.json(events, { status: 200 });
-    } catch (error: unknown) {
-        console.error("Get incident events route caught an error:", error);
-        const err = error as Error;
-        return NextResponse.json(
-            { error: "Internal Server Error", details: err.message },
-            { status: 500 }
-        );
-    }
+    });
 });

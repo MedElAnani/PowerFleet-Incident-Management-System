@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
-import { db } from "../../../../db"
+import { db } from "@/db"
 import { clients, users } from '@/db/schema'
 import { eq } from "drizzle-orm"
 import bcrypt from 'bcryptjs'
+import { withAudit } from '@/lib/utils/audit'
 
 export async function POST(req: Request) {
-    try{
+    return withAudit(req, 'POST auth/register', async () => {
         // 1. Exract the payload
         const { name, companyName, phone, email, password } = await req.json()
         
@@ -43,7 +44,6 @@ export async function POST(req: Request) {
         }
         
         // Regex Validation for Password
-        // Criteria: Starts with Capital letter, contains a symbol, contains a number, min 6 total chars
         const passwordRegex = /^[A-Z](?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).{5,}$/
 
         if (!passwordRegex.test(password)) {
@@ -56,50 +56,47 @@ export async function POST(req: Request) {
             )
         }
         
-        // 3. Security layer: Hash the password
-        const hashedPassword = await bcrypt.hash(password, 10)
-        
-        // 4. Data persistence layer using Drizzle query builder syntax
-        // .returning() forces Postgres to send back only the fields we declare, keeping hashes private
-                const [newUser] = await db
-            .insert(users)
-            .values({
-                email: trimmedEmail,
-                password: hashedPassword,
-                name
-            })
-            .returning({
-                id: users.id,
-                name: users.name,
-                email: users.email,
-                createdAt: users.createdAt
-            })
-        
-        await db
-            .insert(clients)
-            .values({
-                companyName,
-                phone,
-                userId: newUser.id
-            });
-        
-        // 5. Success Response
-        return NextResponse.json(
-            { success: true, data: { ...newUser, role: "ClientUser" } },
-            { status: 201 }
-        )
-    } catch (err: unknown) {
-        const pgErr = err as { code?: string };
-        if (pgErr.code === "23505") {
+        try {
+            // 3. Security layer: Hash the password
+            const hashedPassword = await bcrypt.hash(password, 10)
+            
+            // 4. Data persistence layer using Drizzle query builder syntax
+            const [newUser] = await db
+                .insert(users)
+                .values({
+                    email: trimmedEmail,
+                    password: hashedPassword,
+                    name
+                })
+                .returning({
+                    id: users.id,
+                    name: users.name,
+                    email: users.email,
+                    createdAt: users.createdAt
+                })
+            
+            await db
+                .insert(clients)
+                .values({
+                    companyName,
+                    phone,
+                    userId: newUser.id
+                });
+            
+            // 5. Success Response
             return NextResponse.json(
-                { success: false, error: "An account associated with this email address already exists." },
-                { status: 400 }
+                { success: true, message: "Register successfully", user: { id: newUser.id }, data: { ...newUser, role: "ClientUser" } },
+                { status: 201 }
             )
+        } catch (err: unknown) {
+            const pgErr = err as { code?: string };
+            if (pgErr.code === "23505") {
+                return NextResponse.json(
+                    { success: false, error: "An account associated with this email address already exists." },
+                    { status: 400 }
+                )
+            }
+            throw err;
         }
-        
-        return NextResponse.json(
-            { success: false, error: "A fatal error occurred during initialization." },
-            { status: 500 }
-        )
-    }
+    });
 }
