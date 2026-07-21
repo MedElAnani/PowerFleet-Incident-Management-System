@@ -27,7 +27,7 @@ describe("Incident Filtering & Search API", () => {
         await db.insert(admins).values({
             internalUserId: adminInt.userId, canManageUsers: true
         });
-        adminToken = jwt.sign({ userID: admin.id, userROLE: "Admin" }, process.env.JWT_SECRET!);
+        adminToken = jwt.sign({ userID: admin.id, tokenVersion: 1, userROLE: "Admin" }, process.env.JWT_SECRET!);
 
         // 2. Create Technician
         const [tech] = await db.insert(users).values({
@@ -41,7 +41,7 @@ describe("Incident Filtering & Search API", () => {
             internalUserId: techInt.userId, specialty: "GPS Tracking", isAvailable: true
         }).returning();
         techRecord = techRec;
-        techToken = jwt.sign({ userID: tech.id, userROLE: "Technician" }, process.env.JWT_SECRET!);
+        techToken = jwt.sign({ userID: tech.id, tokenVersion: 1, userROLE: "Technician" }, process.env.JWT_SECRET!);
 
         // 3. Create Client
         const [client] = await db.insert(users).values({
@@ -52,7 +52,7 @@ describe("Incident Filtering & Search API", () => {
             companyName: "Client Corp", phone: "111", userId: client.id
         }).returning();
         clientProfile = profile;
-        clientToken = jwt.sign({ userID: client.id, userROLE: "ClientUser" }, process.env.JWT_SECRET!);
+        clientToken = jwt.sign({ userID: client.id, tokenVersion: 1, userROLE: "ClientUser" }, process.env.JWT_SECRET!);
 
         // 4. Create Vehicle
         const [v1] = await db.insert(vehicles).values({

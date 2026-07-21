@@ -6,7 +6,7 @@ import gsap from "gsap";
 import { ScrollToPlugin } from "gsap/ScrollToPlugin";
 import { Observer } from "gsap/Observer";
 import { ChevronDown } from "lucide-react";
-import { Card } from "@/components/ui/card";
+
 import BentoFeatures from "@/components/auth/BentoFeatures";
 import SlidingAuth from "@/components/auth/SlidingAuth";
 import DiscoverCTA from "@/components/landing/DiscoverCTA";
@@ -18,6 +18,7 @@ gsap.registerPlugin(useGSAP, ScrollToPlugin, Observer);
 /*
 This helper function makes a group of elements animate along the x-axis in a seamless, responsive loop.
 */
+/* eslint-disable @typescript-eslint/no-explicit-any, prefer-const, @typescript-eslint/no-unused-expressions */
 function horizontalLoop(items: any, config: any) {
   items = gsap.utils.toArray(items);
   config = config || {};
@@ -77,6 +78,7 @@ function horizontalLoop(items: any, config: any) {
   }
   return tl;
 }
+/* eslint-enable @typescript-eslint/no-explicit-any, prefer-const, @typescript-eslint/no-unused-expressions */
 
 export default function LandingPage() {
   const container = useRef<HTMLDivElement>(null);
@@ -131,8 +133,8 @@ export default function LandingPage() {
   // Use contextSafe for click handlers to ensure proper GSAP cleanup
   const { contextSafe } = useGSAP({ scope: container });
 
+  // eslint-disable-next-line react-hooks/refs
   const scrollToAuth = contextSafe(() => {
-    // eslint-disable-next-line react-hooks/refs
     if (authSectionRef.current) {
       gsap.to(window, {
         duration: 1,

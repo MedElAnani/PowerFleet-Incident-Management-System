@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import axios from "axios";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -56,6 +57,7 @@ const itemVariants: Variants = {
 };
 
 export default function SlidingAuth() {
+  const router = useRouter();
   const [isLogin, setIsLogin] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("")
@@ -75,6 +77,16 @@ export default function SlidingAuth() {
     setIsLogin(loginMode);
     setError(null);
     setSuccess(null);
+  };
+
+  const handleAuthError = (err: unknown, defaultMessage: string) => {
+    if (axios.isAxiosError(err)) {
+      setError(err.response?.data?.error || err.response?.data?.message || err.message || defaultMessage);
+    } else if (err instanceof Error) {
+      setError(err.message || "An unexpected error occurred.");
+    } else {
+      setError("An unexpected error occurred.");
+    }
   };
 
   const getValidationClasses = (value: string, type: 'email' | 'password' | 'name' | 'phone') => {
@@ -101,16 +113,10 @@ export default function SlidingAuth() {
       });
       setSuccess("Successfully logged in! Redirecting...");
       setTimeout(() => {
-        window.location.href = "/dashboard";
+        router.push("/dashboard");
       }, 1000);
     }catch(err: unknown){
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.error || err.response?.data?.message || err.message || "Invalid credentials");
-      } else if (err instanceof Error) {
-        setError(err.message || "An unexpected error occurred.");
-      } else {
-        setError("An unexpected error occurred.");
-      }
+      handleAuthError(err, "Invalid credentials");
     } finally {
       setIsLoading(false);
     }
@@ -134,13 +140,7 @@ export default function SlidingAuth() {
         toggleMode(true);
       }, 2000);
     }catch(err: unknown){
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.error || err.response?.data?.message || err.message || "Failed to create account");
-      } else if (err instanceof Error) {
-        setError(err.message || "An unexpected error occurred.");
-      } else {
-        setError("An unexpected error occurred.");
-      }
+      handleAuthError(err, "Failed to create account");
     } finally {
       setIsLoading(false);
     }

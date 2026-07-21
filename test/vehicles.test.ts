@@ -35,7 +35,7 @@ describe("Vehicles API Endpoints", () => {
             internalUserId: adminInt.userId,
             canManageUsers: true
         });
-        adminToken = jwt.sign({ userID: admin.id, userROLE: "Admin" }, process.env.JWT_SECRET!);
+        adminToken = jwt.sign({ userID: admin.id, tokenVersion: 1, userROLE: "Admin" }, process.env.JWT_SECRET!);
 
         // Create Client 1
         const [client1] = await db.insert(users).values({
@@ -51,7 +51,7 @@ describe("Vehicles API Endpoints", () => {
             userId: client1.id
         }).returning();
         clientProfile1 = profile1;
-        clientToken1 = jwt.sign({ userID: client1.id, userROLE: "ClientUser" }, process.env.JWT_SECRET!);
+        clientToken1 = jwt.sign({ userID: client1.id, tokenVersion: 1, userROLE: "ClientUser" }, process.env.JWT_SECRET!);
 
         // Create Client 2
         const [client2] = await db.insert(users).values({
@@ -66,7 +66,7 @@ describe("Vehicles API Endpoints", () => {
             phone: "654321",
             userId: client2.id
         });
-        clientToken2 = jwt.sign({ userID: client2.id, userROLE: "ClientUser" }, process.env.JWT_SECRET!);
+        clientToken2 = jwt.sign({ userID: client2.id, tokenVersion: 1, userROLE: "ClientUser" }, process.env.JWT_SECRET!);
     });
 
     afterAll(async () => {

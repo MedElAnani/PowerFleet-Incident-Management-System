@@ -245,7 +245,7 @@ export default function BentoFeatures({ className }: BentoFeaturesProps) {
 
         {/* Bottom Card */}
         <div
-          className={cn(bentoCardClass, "min-h-[280px] flex-col items-stretch gap-8 p-0! md:col-span-3 md:flex-row")}
+          className={cn(bentoCardClass, "min-h-[280px] flex-col items-stretch gap-8 !p-0 md:col-span-3 md:flex-row")}
           onMouseEnter={() => setHoveredCard(3)}
           onMouseLeave={() => setHoveredCard(null)}
         >
