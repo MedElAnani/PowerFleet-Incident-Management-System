@@ -30,7 +30,7 @@ describe("Comments API & Visibility Endpoints", () => {
         await db.insert(admins).values({
             internalUserId: adminInt.userId, canManageUsers: true
         });
-        adminToken = jwt.sign({ userID: admin.id, userROLE: "Admin" }, process.env.JWT_SECRET!);
+        adminToken = jwt.sign({ userID: admin.id, tokenVersion: 1, userROLE: "Admin" }, process.env.JWT_SECRET!);
 
         // 2. Create Client
         const [client] = await db.insert(users).values({
@@ -41,7 +41,7 @@ describe("Comments API & Visibility Endpoints", () => {
             companyName: "Comment Client Corp", phone: "777", userId: client.id
         }).returning();
         clientProfile = profile;
-        clientToken = jwt.sign({ userID: client.id, userROLE: "ClientUser" }, process.env.JWT_SECRET!);
+        clientToken = jwt.sign({ userID: client.id, tokenVersion: 1, userROLE: "ClientUser" }, process.env.JWT_SECRET!);
 
         // 3. Create Tech 1 (Assigned Tech)
         const [tech1] = await db.insert(users).values({
@@ -55,7 +55,7 @@ describe("Comments API & Visibility Endpoints", () => {
             internalUserId: techInt1.userId, specialty: "GPS Tracking", isAvailable: true
         }).returning();
         techRecord1 = techRec1;
-        techToken1 = jwt.sign({ userID: tech1.id, userROLE: "Technician" }, process.env.JWT_SECRET!);
+        techToken1 = jwt.sign({ userID: tech1.id, tokenVersion: 1, userROLE: "Technician" }, process.env.JWT_SECRET!);
 
         // 4. Create Tech 2 (Unassigned Tech)
         const [tech2] = await db.insert(users).values({
@@ -68,7 +68,7 @@ describe("Comments API & Visibility Endpoints", () => {
         await db.insert(technicians).values({
             internalUserId: techInt2.userId, specialty: "GPS Tracking", isAvailable: true
         });
-        techToken2 = jwt.sign({ userID: tech2.id, userROLE: "Technician" }, process.env.JWT_SECRET!);
+        techToken2 = jwt.sign({ userID: tech2.id, tokenVersion: 1, userROLE: "Technician" }, process.env.JWT_SECRET!);
 
         // 5. Create Vehicle
         const [v] = await db.insert(vehicles).values({

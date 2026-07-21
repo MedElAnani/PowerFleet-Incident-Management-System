@@ -34,6 +34,7 @@ export const users = pgTable("users", {
     name: text("name").notNull(),
     email: text("email").notNull().unique(),
     password: text("password").notNull(),
+    tokenVersion: integer("token_version").notNull().default(1),
     createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).defaultNow(),
     deletedAt: timestamp('deleted_at', { mode: 'date', withTimezone: true })

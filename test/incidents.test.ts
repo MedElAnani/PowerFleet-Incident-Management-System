@@ -31,7 +31,7 @@ describe("Incidents API Endpoints", () => {
         await db.insert(admins).values({
             internalUserId: adminInt.userId, canManageUsers: true
         });
-        adminToken = jwt.sign({ userID: admin.id, userROLE: "Admin" }, process.env.JWT_SECRET!);
+        adminToken = jwt.sign({ userID: admin.id, tokenVersion: 1, userROLE: "Admin" }, process.env.JWT_SECRET!);
 
         // 2. Create Support Manager
         const [manager] = await db.insert(users).values({
@@ -44,7 +44,7 @@ describe("Incidents API Endpoints", () => {
         await db.insert(support_managers).values({
             internalUserId: managerInt.userId, canAssign: true
         });
-        managerToken = jwt.sign({ userID: manager.id, userROLE: "Support Manager" }, process.env.JWT_SECRET!);
+        managerToken = jwt.sign({ userID: manager.id, tokenVersion: 1, userROLE: "Support Manager" }, process.env.JWT_SECRET!);
 
         // 3. Create Technician
         const [tech] = await db.insert(users).values({
@@ -58,7 +58,7 @@ describe("Incidents API Endpoints", () => {
             internalUserId: techInt.userId, specialty: "GPS Tracking", isAvailable: true
         }).returning();
         techRecord = techRec;
-        techToken = jwt.sign({ userID: tech.id, userROLE: "Technician" }, process.env.JWT_SECRET!);
+        techToken = jwt.sign({ userID: tech.id, tokenVersion: 1, userROLE: "Technician" }, process.env.JWT_SECRET!);
 
         // 4. Create Inactive Technician
         const [inactive] = await db.insert(users).values({
@@ -71,7 +71,7 @@ describe("Incidents API Endpoints", () => {
         await db.insert(technicians).values({
             internalUserId: inactiveInt.userId, specialty: "GPS Tracking", isAvailable: true
         });
-        inactiveToken = jwt.sign({ userID: inactive.id, userROLE: "Technician" }, process.env.JWT_SECRET!);
+        inactiveToken = jwt.sign({ userID: inactive.id, tokenVersion: 1, userROLE: "Technician" }, process.env.JWT_SECRET!);
 
         // 5. Create Clients
         const [client1] = await db.insert(users).values({
@@ -82,7 +82,7 @@ describe("Incidents API Endpoints", () => {
             companyName: "Client 1 Corp", phone: "111", userId: client1.id
         }).returning();
         clientProfile1 = profile1;
-        clientToken1 = jwt.sign({ userID: client1.id, userROLE: "ClientUser" }, process.env.JWT_SECRET!);
+        clientToken1 = jwt.sign({ userID: client1.id, tokenVersion: 1, userROLE: "ClientUser" }, process.env.JWT_SECRET!);
 
         const [client2] = await db.insert(users).values({
             name: "Client 2", email: "client2_test_incidents@example.com", password: "HashedPassword123!"
