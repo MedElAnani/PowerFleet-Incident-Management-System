@@ -263,9 +263,9 @@ export default function BentoFeatures({ className }: BentoFeaturesProps) {
             <div className="relative flex w-[110%] flex-col transition-transform duration-500 ease-out">
               {/* Avatar Stack */}
               <div className="relative z-20 mb-4 flex -space-x-3">
-                {avatars.map((avatar, idx) => (
+                {avatars.map((avatar) => (
                   <img
-                    key={idx}
+                    key={avatar.name}
                     src={avatar.src}
                     alt={avatar.name}
                     className="border-background size-10 rounded-full border-2 object-cover shadow-sm transition-transform duration-300 hover:scale-110"

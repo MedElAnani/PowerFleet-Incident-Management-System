@@ -7,8 +7,37 @@ import jwt from "jsonwebtoken"
 import { resolveUserRole } from "@/lib/services/role"
 import { withAudit } from "@/lib/utils/audit";
 
+// Global in-memory rate limiter for simple protection
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const MAX_ATTEMPTS = 5;
+const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function isRateLimited(ip: string): boolean {
+    const now = Date.now();
+    const entry = rateLimitMap.get(ip);
+
+    if (!entry || now > entry.resetTime) {
+        rateLimitMap.set(ip, { count: 1, resetTime: now + WINDOW_MS });
+        return false;
+    }
+
+    entry.count += 1;
+    if (entry.count > MAX_ATTEMPTS) {
+        return true;
+    }
+    return false;
+}
+
 export async function POST(req: Request) {
     return withAudit(req, 'POST auth/login', async () => {
+        const ip = req.headers.get("x-forwarded-for") || "unknown_ip";
+        if (isRateLimited(ip)) {
+            return NextResponse.json(
+                { success: false, error: "Too many login attempts. Please try again in 15 minutes." },
+                { status: 429 }
+            );
+        }
+
         const { email, password } = await req.json()
         
         // 1. Check if email or password are empty
@@ -51,10 +80,11 @@ export async function POST(req: Request) {
             );
         }
         
-        // 5. Generate JWT (using only userID)
+        // 5. Generate JWT (using userID and tokenVersion)
         const token = jwt.sign(
             {
-                userID: user.id
+                userID: user.id,
+                tokenVersion: user.tokenVersion
             },
             process.env.JWT_SECRET!,
             { expiresIn: "1d" }

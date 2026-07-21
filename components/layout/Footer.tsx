@@ -27,8 +27,6 @@ export interface Footer15Props {
   columns?: Footer15Column[];
   /** Large brand text in the bottom hero section */
   heroBrandName?: string;
-  /** Copyright year / text */
-  copyrightYear?: string;
 }
 
 const defaultColumns: Footer15Column[] = [
@@ -140,7 +138,7 @@ export default function Footer({
   ctaHref = "#",
   columns = defaultColumns,
   heroBrandName = "POWER FLEET",
-}: Footer15Props) {
+}: Readonly<Footer15Props>) {
   return (
     <footer className="w-full overflow-hidden rounded-t-4xl bg-slate-950 font-sans antialiased sm:rounded-t-[2.5rem] md:rounded-t-[3rem]">
       <motion.div

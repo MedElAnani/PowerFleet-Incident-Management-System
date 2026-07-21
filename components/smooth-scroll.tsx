@@ -3,7 +3,7 @@
 import { ReactLenis } from "lenis/react";
 import { ReactNode } from "react";
 
-export function SmoothScroll({ children }: { children: ReactNode }) {
+export function SmoothScroll({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <ReactLenis root options={{ lerp: 0.08, duration: 1.2, smoothWheel: true }}>
       {children}

@@ -81,7 +81,7 @@ export default function SlidingAuth() {
     if (value.length === 0) return "border-slate-200 dark:border-slate-800 focus:border-emerald-500 focus:ring-emerald-500";
     let isValid = false;
     if (type === 'email') isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-    if (type === 'password') isValid = /^[A-Z](?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{5,}$/.test(value);
+    if (type === 'password') isValid = /^[A-Z](?=.*[0-9])(?=.*[^a-zA-Z0-9]).{4,}$/.test(value);
     if (type === 'name') isValid = value.trim().length >= 2;
     if (type === 'phone') isValid = value.trim().length >= 8;
     return isValid
@@ -264,9 +264,9 @@ export default function SlidingAuth() {
                       Keep me signed in
                     </label>
                   </div>
-                  <a href="#" className="text-[14px] font-medium text-emerald-600 dark:text-emerald-400 hover:underline transition-colors">
+                  <button type="button" className="text-[14px] font-medium text-emerald-600 dark:text-emerald-400 hover:underline transition-colors">
                     Forgot password?
-                  </a>
+                  </button>
                 </motion.div>
 
                 <motion.div variants={itemVariants} className="mt-2">

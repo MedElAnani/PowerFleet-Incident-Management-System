@@ -9,7 +9,7 @@ interface RevealSectionProps {
   delay?: number;
 }
 
-export function RevealSection({ children, className, delay = 0 }: RevealSectionProps) {
+export function RevealSection({ children, className, delay = 0 }: Readonly<RevealSectionProps>) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 50 }}

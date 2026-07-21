@@ -16,12 +16,12 @@ function GlowingBorderCard({
   className,
   glowColor,
   repeatingGradient,
-}: {
+}: Readonly<{
   children: React.ReactNode;
   className?: string;
   glowColor: string;
   repeatingGradient: string;
-}) {
+}>) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [opacity, setOpacity] = useState(0);

@@ -33,13 +33,13 @@ function horizontalLoop(items: any, config: any) {
     totalWidth, curX, distanceToStart, distanceToLoop, item, i;
   gsap.set(items, {
     xPercent: (i, el) => {
-      let w = widths[i] = parseFloat(gsap.getProperty(el, "width", "px") as string);
-      xPercents[i] = snap(parseFloat(gsap.getProperty(el, "x", "px") as string) / w * 100 + (gsap.getProperty(el, "xPercent") as number));
+      let w = widths[i] = Number.parseFloat(gsap.getProperty(el, "width", "px") as string);
+      xPercents[i] = snap(Number.parseFloat(gsap.getProperty(el, "x", "px") as string) / w * 100 + (gsap.getProperty(el, "xPercent") as number));
       return xPercents[i];
     }
   });
   gsap.set(items, {x: 0});
-  totalWidth = items[length-1].offsetLeft + xPercents[length-1] / 100 * widths[length-1] - startX + items[length-1].offsetWidth * (gsap.getProperty(items[length-1], "scaleX") as number) + (parseFloat(config.paddingRight) || 0);
+  totalWidth = items[length-1].offsetLeft + xPercents[length-1] / 100 * widths[length-1] - startX + items[length-1].offsetWidth * (gsap.getProperty(items[length-1], "scaleX") as number) + (Number.parseFloat(config.paddingRight) || 0);
   for (i = 0; i < length; i++) {
     item = items[i];
     curX = xPercents[i] / 100 * widths[i];
@@ -132,6 +132,7 @@ export default function LandingPage() {
   const { contextSafe } = useGSAP({ scope: container });
 
   const scrollToAuth = contextSafe(() => {
+    // eslint-disable-next-line react-hooks/refs
     if (authSectionRef.current) {
       gsap.to(window, {
         duration: 1,
