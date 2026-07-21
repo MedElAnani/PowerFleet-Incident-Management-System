@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { ScrollToPlugin } from "gsap/ScrollToPlugin";
@@ -70,7 +70,9 @@ function horizontalLoop(items: any, config: any) {
   (tl as any).times = times;
   tl.progress(1, true).progress(0, true);
   if (config.reversed) {
-    tl.vars.onReverseComplete();
+    if (tl.vars.onReverseComplete) {
+      tl.vars.onReverseComplete();
+    }
     tl.reverse();
   }
   return tl;
@@ -130,11 +132,13 @@ export default function LandingPage() {
   const { contextSafe } = useGSAP({ scope: container });
 
   const scrollToAuth = contextSafe(() => {
-    gsap.to(window, {
-      duration: 1,
-      scrollTo: authSectionRef.current,
-      ease: "power3.inOut"
-    });
+    if (authSectionRef.current) {
+      gsap.to(window, {
+        duration: 1,
+        scrollTo: authSectionRef.current,
+        ease: "power3.inOut"
+      });
+    }
   });
 
   return (

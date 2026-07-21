@@ -95,7 +95,7 @@ export default function SlidingAuth() {
     setError(null);
     setSuccess(null);
     try{
-      const response = await axios.post('/api/auth/login', {
+      await axios.post('/api/auth/login', {
         email,
         password
       });
@@ -103,11 +103,13 @@ export default function SlidingAuth() {
       setTimeout(() => {
         window.location.href = "/dashboard";
       }, 1000);
-    }catch(err: any){
+    }catch(err: unknown){
       if (axios.isAxiosError(err)) {
         setError(err.response?.data?.error || err.response?.data?.message || err.message || "Invalid credentials");
-      } else {
+      } else if (err instanceof Error) {
         setError(err.message || "An unexpected error occurred.");
+      } else {
+        setError("An unexpected error occurred.");
       }
     } finally {
       setIsLoading(false);
@@ -120,7 +122,7 @@ export default function SlidingAuth() {
     setError(null);
     setSuccess(null);
     try{
-      const response = await axios.post('/api/auth/register', {
+      await axios.post('/api/auth/register', {
         name: registerName,
         companyName,
         phone,
@@ -131,11 +133,13 @@ export default function SlidingAuth() {
       setTimeout(() => {
         toggleMode(true);
       }, 2000);
-    }catch(err: any){
+    }catch(err: unknown){
       if (axios.isAxiosError(err)) {
         setError(err.response?.data?.error || err.response?.data?.message || err.message || "Failed to create account");
-      } else {
+      } else if (err instanceof Error) {
         setError(err.message || "An unexpected error occurred.");
+      } else {
+        setError("An unexpected error occurred.");
       }
     } finally {
       setIsLoading(false);
