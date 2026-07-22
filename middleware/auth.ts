@@ -19,15 +19,29 @@ export function withAuth(handler: NextRouteHandler, requiredType?: "Admin" | "Su
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return async (request: Request, ...args: any[]) => {
         try {
-            // 1. Check For Authorization Header
-            const authHeader = request.headers.get("authorization")
-            if(!authHeader?.startsWith("Bearer ")) {
-                return NextResponse.json(
-                    { error: "Unauthorized: Missing token" }, {status: 401}
-                )
+            // 1. Extract Token from Authorization Header or Cookies
+            let token: string | undefined;
+            const authHeader = request.headers.get("authorization");
+            if (authHeader?.startsWith("Bearer ")) {
+                token = authHeader.split(" ")[1];
+            } else {
+                const cookieHeader = request.headers.get("cookie");
+                if (cookieHeader) {
+                    const cookiesMap = Object.fromEntries(
+                        cookieHeader.split("; ").map((c) => {
+                            const [k, ...v] = c.split("=");
+                            return [k, v.join("=")];
+                        })
+                    );
+                    token = cookiesMap["auth_token"] || cookiesMap["token"];
+                }
             }
-            
-            const token = authHeader.split(" ")[1]
+
+            if (!token) {
+                return NextResponse.json(
+                    { error: "Unauthorized: Missing token" }, { status: 401 }
+                );
+            }
             
             // 2. Verify JWT Token
             let decoded: { userID: number; tokenVersion?: number };

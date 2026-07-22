@@ -113,7 +113,7 @@ export default function SlidingAuth() {
       });
       setSuccess("Successfully logged in! Redirecting...");
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push("/incidents/dashboard");
       }, 1000);
     }catch(err: unknown){
       handleAuthError(err, "Invalid credentials");
