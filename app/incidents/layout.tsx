@@ -56,12 +56,12 @@ export default async function IncidentsLayout({
         {/* Quick Action FAB: Create New Incident -> /incidents/new */}
         <Link
           href="/incidents/new"
-          className="fixed bottom-7 left-7 z-50 flex items-center gap-3 px-5 py-3.5 rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-950 font-semibold text-xs border border-slate-800 dark:border-slate-200 shadow-xl shadow-slate-950/20 hover:bg-slate-800 dark:hover:bg-white hover:scale-105 active:scale-95 transition-all select-none"
+          className="fixed bottom-24 right-4 sm:bottom-7 sm:left-7 sm:right-auto z-50 flex items-center gap-3 p-3.5 sm:px-5 sm:py-3.5 rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-950 font-semibold text-xs border border-slate-800 dark:border-slate-200 shadow-xl shadow-slate-950/20 hover:bg-slate-800 dark:hover:bg-white hover:scale-105 active:scale-95 transition-all select-none"
         >
           <div className="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-slate-950">
             <Plus className="size-3.5 stroke-[3]" />
           </div>
-          <span className="tracking-wide font-bold">Create New Incident</span>
+          <span className="hidden sm:inline tracking-wide font-bold">Create New Incident</span>
           <AlertTriangle className="size-4 text-amber-500 opacity-90" />
         </Link>
 

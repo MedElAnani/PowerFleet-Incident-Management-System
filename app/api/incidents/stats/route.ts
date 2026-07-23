@@ -56,6 +56,15 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
               { day: "Sat", gps: 0, vehicle: 0, fuel: 0, accident: 0 },
               { day: "Sun", gps: 0, vehicle: 0, fuel: 0, accident: 0 },
             ],
+            dailyStatusBreakdown: [
+              { day: "Mon", open: 0, inProgress: 0, resolved: 0 },
+              { day: "Tue", open: 0, inProgress: 0, resolved: 0 },
+              { day: "Wed", open: 0, inProgress: 0, resolved: 0 },
+              { day: "Thu", open: 0, inProgress: 0, resolved: 0 },
+              { day: "Fri", open: 0, inProgress: 0, resolved: 0 },
+              { day: "Sat", open: 0, inProgress: 0, resolved: 0 },
+              { day: "Sun", open: 0, inProgress: 0, resolved: 0 },
+            ],
             recentIncidents: [],
             recentAuditLogs: [],
           });
@@ -126,10 +135,11 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
         .where(baseFilter)
         .groupBy(incidents.type);
 
-      // 6. Fetch All Incidents for Daily SLA & Category Breakdown calculations
+      // 6. Fetch All Incidents for Daily SLA, Category & Status Breakdown calculations
       const allIncidents = await db
         .select({
           slaStatus: incidents.slaStatus,
+          status: incidents.status,
           type: incidents.type,
           createdAt: incidents.createdAt,
         })
@@ -156,6 +166,16 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
         Fri: { gps: 0, vehicle: 0, fuel: 0, accident: 0 },
         Sat: { gps: 0, vehicle: 0, fuel: 0, accident: 0 },
         Sun: { gps: 0, vehicle: 0, fuel: 0, accident: 0 },
+      };
+
+      const dailyStatusMap: Record<string, { open: number; inProgress: number; resolved: number }> = {
+        Mon: { open: 0, inProgress: 0, resolved: 0 },
+        Tue: { open: 0, inProgress: 0, resolved: 0 },
+        Wed: { open: 0, inProgress: 0, resolved: 0 },
+        Thu: { open: 0, inProgress: 0, resolved: 0 },
+        Fri: { open: 0, inProgress: 0, resolved: 0 },
+        Sat: { open: 0, inProgress: 0, resolved: 0 },
+        Sun: { open: 0, inProgress: 0, resolved: 0 },
       };
 
       allIncidents.forEach((inc) => {
@@ -186,6 +206,16 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
         } else {
           dailyCatMap[dayName].gps += 1;
         }
+
+        // Ticket Status breakdown
+        const st = inc.status || "New";
+        if (st === "Resolved" || st === "Closed") {
+          dailyStatusMap[dayName].resolved += 1;
+        } else if (st === "In Progress" || st === "Waiting Client" || st === "Waiting Technician") {
+          dailyStatusMap[dayName].inProgress += 1;
+        } else {
+          dailyStatusMap[dayName].open += 1;
+        }
       });
 
       const dailySlaBreakdown = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => ({
@@ -201,6 +231,13 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
         vehicle: dailyCatMap[day].vehicle,
         fuel: dailyCatMap[day].fuel,
         accident: dailyCatMap[day].accident,
+      }));
+
+      const dailyStatusBreakdown = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => ({
+        day,
+        open: dailyStatusMap[day].open,
+        inProgress: dailyStatusMap[day].inProgress,
+        resolved: dailyStatusMap[day].resolved,
       }));
 
       // 7. Recent Active/Critical Incidents (Limit 5)
@@ -247,6 +284,7 @@ export const GET = withAuth(async (req: AuthenticatedRequest) => {
         })),
         dailySlaBreakdown,
         dailyCategoryBreakdown,
+        dailyStatusBreakdown,
         recentIncidents: recentIncidents.map((inc) => ({
           id: `INC-${inc.id}`,
           title: inc.title,

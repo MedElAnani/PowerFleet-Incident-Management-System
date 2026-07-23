@@ -21,3 +21,11 @@ export const POST = withAuth(async (req: AuthenticatedRequest) => {
         )
     });
 }, "Admin")
+
+export const GET = withAuth(async (req: AuthenticatedRequest) => {
+    return withAudit(req, 'GET /vehicles', async () => {
+        const currentUser = req.user!;
+        const vehicles = await VehicleService.getVehicles(currentUser.userId, currentUser.role as string);
+        return NextResponse.json(vehicles, { status: 200 });
+    });
+});

@@ -10,11 +10,16 @@ import {
   Activity, 
   ShieldAlert,
   Truck,
-  ArrowUpRight,
   Loader2,
   ShieldCheck,
-  Lock
+  Lock,
+  Eye,
+  Edit,
+  MessageSquare,
+  CheckSquare,
+  Trash2
 } from "lucide-react";
+import InlineDisclosureMenu, { MenuAction } from "@/components/ui/InlineDisclosureMenu";
 import { 
   AreaChart, 
   Area, 
@@ -47,6 +52,7 @@ export interface DashboardStats {
   categoryDistribution: Array<{ category: string; count: number }>;
   dailySlaBreakdown?: Array<{ day: string; healthy: number; warning: number; breached: number }>;
   dailyCategoryBreakdown?: Array<{ day: string; gps: number; vehicle: number; fuel: number; accident: number }>;
+  dailyStatusBreakdown?: Array<{ day: string; open: number; inProgress: number; resolved: number }>;
   recentIncidents: Array<{
     id: string;
     title: string;
@@ -56,17 +62,17 @@ export interface DashboardStats {
     slaStatus?: string;
     createdAt: string;
     vehicle: string;
+    assignedTo?: string | null;
   }>;
   recentAuditLogs?: AuditLogItem[];
 }
 
 const DEFAULT_CATEGORIES = ["GPS Device", "Vehicle", "Fuel", "Accident", "Maintenance"];
 
-const CATEGORY_CHANNELS = [
-  { key: "gps", label: "GPS Offline", color: "#10b981" },
-  { key: "vehicle", label: "Vehicle Defect", color: "#3b82f6" },
-  { key: "fuel", label: "Fuel Anomaly", color: "#f59e0b" },
-  { key: "accident", label: "Accident Report", color: "#f43f5e" },
+const TICKET_STATUS_CHANNELS = [
+  { key: "open", label: "Open / New", color: "#3b82f6" },
+  { key: "inProgress", label: "In Progress", color: "#f59e0b" },
+  { key: "resolved", label: "Resolved", color: "#10b981" },
 ];
 
 export default function IncidentsDashboardPage() {
@@ -365,13 +371,13 @@ export default function IncidentsDashboardPage() {
         {/* RIGHT COLUMN: Stacked Widgets (Top: Widget 3 Stacked Bar, Bottom: Widget 4 Doughnut) */}
         <div className="lg:col-span-1 flex flex-col gap-6">
           
-          {/* Top Right: Watermelon Widget 3 (Daily Category Stack for Client vs Daily SLA Stack for Internal) */}
+          {/* Top Right: Watermelon Widget 3 (Daily Ticket Status Stack for Client vs Daily SLA Stack for Internal) */}
           {isClient ? (
             <SalesBreakdownWidget
-              title="Daily Fleet Incident Breakdown"
-              subtitle="Weekly stacked distribution across issue categories"
-              data={stats?.dailyCategoryBreakdown}
-              channels={CATEGORY_CHANNELS}
+              title="Daily Ticket Status Breakdown"
+              subtitle="Weekly stacked distribution by ticket status"
+              data={stats?.dailyStatusBreakdown}
+              channels={TICKET_STATUS_CHANNELS}
             />
           ) : (
             <SalesBreakdownWidget
@@ -415,33 +421,107 @@ export default function IncidentsDashboardPage() {
             No incidents logged in the database yet. Click &quot;Create New Incident&quot; to report one!
           </div>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
-            {stats?.recentIncidents.map((item) => (
-              <div key={item.id} className="py-3 flex items-center justify-between gap-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 px-2 rounded-lg transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="size-2 rounded-full bg-emerald-500" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-900 dark:text-white">{item.id}</span>
-                      <span className="text-slate-300 dark:text-slate-700">•</span>
-                      <span className="text-slate-600 dark:text-slate-300">{item.vehicle}</span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{item.title} ({item.type})</p>
-                  </div>
-                </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs whitespace-nowrap">
+              <thead className="text-[10px] uppercase text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                <tr>
+                  <th className="font-semibold py-3 px-2">Ticket & Vehicle</th>
+                  <th className="font-semibold py-3 px-2">SLA Status</th>
+                  <th className="font-semibold py-3 px-2">Ticket Status</th>
+                  <th className="font-semibold py-3 px-2">Assigned Tech</th>
+                  <th className="font-semibold py-3 px-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                {stats?.recentIncidents.map((item) => {
+                  
+                  // RBAC Menu Actions
+                  const menuActions: MenuAction[] = [
+                    { label: "View Incident", icon: Eye, onClick: () => console.log("View", item.id) }
+                  ];
 
-                <div className="flex items-center gap-3">
-                  {isClient ? (
-                    <span className="px-2.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                      {item.status}
-                    </span>
-                  ) : (
-                    <SlaBadge status={item.slaStatus} />
-                  )}
-                  <ArrowUpRight className="size-4 text-slate-400" />
-                </div>
-              </div>
-            ))}
+                  if (isClient) {
+                    menuActions.push({ label: "Edit Details", icon: Edit, onClick: () => console.log("Edit", item.id) });
+                  } else if (role === "Technician") {
+                    menuActions.push({ label: "Add Internal Note", icon: MessageSquare, onClick: () => console.log("Note", item.id) });
+                  } else if (isAdmin || role === "Support Manager") {
+                    menuActions.push({ label: "Resolve Incident", icon: CheckSquare, onClick: () => console.log("Resolve", item.id) });
+                    if (isAdmin) {
+                      menuActions.push({ label: "Delete Ticket", icon: Trash2, onClick: () => console.log("Delete", item.id), destructive: true });
+                    }
+                  }
+
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-3 px-2">
+                        <div className="flex items-center gap-3">
+                          <div className="size-2 rounded-full bg-emerald-500 shrink-0" />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-slate-900 dark:text-white">{item.id}</span>
+                              <span className="text-slate-300 dark:text-slate-700">•</span>
+                              <span className="text-slate-600 dark:text-slate-300">{item.vehicle}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-0.5">{item.title} ({item.type})</p>
+                          </div>
+                        </div>
+                      </td>
+                      
+                      <td className="py-3 px-2">
+                        {!isClient && item.slaStatus ? (
+                          <SlaBadge status={item.slaStatus} />
+                        ) : (
+                          <span className="text-slate-400 italic">N/A</span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-2">
+                        {isClient ? (
+                          <span className="px-2.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            {item.status}
+                          </span>
+                        ) : (
+                          <select
+                            defaultValue={item.status}
+                            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-2 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer w-28"
+                          >
+                            <option value="New">New</option>
+                            <option value="Open">Open</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Waiting Client">Waiting Client</option>
+                            <option value="Resolved">Resolved</option>
+                            <option value="Closed">Closed</option>
+                          </select>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-2">
+                        {isClient ? (
+                          <span className="text-slate-600 dark:text-slate-400">{item.assignedTo || "Unassigned"}</span>
+                        ) : isAdmin || role === "Support Manager" ? (
+                          <select
+                            defaultValue={item.assignedTo || ""}
+                            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-2 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer w-32"
+                          >
+                            <option value="">Unassigned</option>
+                            <option value="John Technician">John Technician</option>
+                            <option value="Sarah Mechanic">Sarah Mechanic</option>
+                          </select>
+                        ) : (
+                          <span className="text-slate-600 dark:text-slate-400 font-medium">{item.assignedTo || "Unassigned"}</span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-2 text-right">
+                        <div className="flex justify-end">
+                          <InlineDisclosureMenu actions={menuActions} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

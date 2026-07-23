@@ -12,6 +12,7 @@ import SlidingAuth from "@/components/auth/SlidingAuth";
 import DiscoverCTA from "@/components/landing/DiscoverCTA";
 import Footer from "@/components/layout/Footer";
 import { RevealSection } from "@/components/reveal-section";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 gsap.registerPlugin(useGSAP, ScrollToPlugin, Observer);
 
@@ -186,7 +187,7 @@ export default function LandingPage() {
               Everything you need to manage your fleet
             </h2>
             <p className="text-lg text-slate-500 max-w-2xl mx-auto">
-              Power Fleet IMS brings dispatchers, mechanics, and drivers together on a single, secure platform.
+              Power Fleet IMS brings dispatchers, technicians, and drivers together on a single, secure platform.
             </p>
           </div>
           <BentoFeatures />
@@ -202,6 +203,9 @@ export default function LandingPage() {
 
       {/* Footer */}
       <Footer />
+      
+      {/* Floating Theme Toggle (Landing Page Only) */}
+      <ThemeToggle />
     </div>
   );
 }

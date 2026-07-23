@@ -105,4 +105,35 @@ export class VehicleService {
 
         return deletedVehicle;
     }
+
+    /**
+     * Gets vehicles for the authenticated user.
+     * Clients only see their own vehicles. Internal users see all.
+     */
+    static async getVehicles(authenticatedUserId: number, role: string) {
+        await this.checkUserNotDeleted(authenticatedUserId);
+
+        if (role === "ClientUser") {
+            return await db.query.vehicles.findMany({
+                where: and(eq(vehicles.clientId, authenticatedUserId), isNull(vehicles.deletedAt)),
+                columns: {
+                    id: true,
+                    name: true,
+                    licensePlate: true,
+                    imei: true,
+                }
+            });
+        } else {
+            return await db.query.vehicles.findMany({
+                where: isNull(vehicles.deletedAt),
+                columns: {
+                    id: true,
+                    name: true,
+                    licensePlate: true,
+                    imei: true,
+                    clientId: true,
+                }
+            });
+        }
+    }
 }

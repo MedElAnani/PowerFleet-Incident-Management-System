@@ -56,7 +56,7 @@ export default function FloatingDock({
     >
       <nav
         aria-label="Main Navigation"
-        className="flex items-center gap-2 p-2.5 rounded-full bg-slate-900/90 dark:bg-slate-900/95 border border-slate-800/90 shadow-2xl backdrop-blur-2xl text-slate-400"
+        className="flex items-center gap-1 sm:gap-2 p-1 sm:p-2.5 rounded-full bg-slate-900/90 dark:bg-slate-900/95 border border-slate-800/90 shadow-2xl backdrop-blur-2xl text-slate-400 max-w-[95vw] overflow-x-auto no-scrollbar"
       >
         {items.map((item) => {
           const Icon = item.icon;
@@ -67,7 +67,7 @@ export default function FloatingDock({
               key={item.id}
               href={item.href}
               className={cn(
-                "relative flex items-center gap-2.5 px-5 py-3 rounded-full text-xs font-semibold transition-colors duration-200 cursor-pointer select-none",
+                "relative flex items-center gap-1.5 sm:gap-2.5 px-2.5 py-2 sm:px-5 sm:py-3 rounded-full text-[10px] sm:text-xs font-semibold transition-colors duration-200 cursor-pointer select-none",
                 isActive
                   ? "text-slate-950 font-bold"
                   : "text-slate-400 hover:text-slate-200 dark:hover:text-slate-100"
@@ -88,7 +88,7 @@ export default function FloatingDock({
 
               {/* Icon & Label Content */}
               <span className="relative z-10 flex items-center gap-2.5">
-                <Icon className="size-5 shrink-0" />
+                <Icon className="size-4 sm:size-5 shrink-0" />
                 
                 {/* Active item expands to reveal label */}
                 {isActive && (
@@ -97,7 +97,7 @@ export default function FloatingDock({
                     animate={{ opacity: 1, width: "auto" }}
                     exit={{ opacity: 0, width: 0 }}
                     transition={{ duration: 0.18 }}
-                    className="whitespace-nowrap font-bold tracking-wide text-xs"
+                    className="whitespace-nowrap font-bold tracking-wide text-[9px] sm:text-xs"
                   >
                     {item.label}
                   </motion.span>
@@ -107,7 +107,7 @@ export default function FloatingDock({
                 {Boolean(item.badgeCount && item.badgeCount > 0) && (
                   <span
                     className={cn(
-                      "flex h-4 min-w-4 items-center justify-center rounded-full text-[10px] font-bold px-1.5",
+                      "flex h-3 min-w-3 sm:h-4 sm:min-w-4 items-center justify-center rounded-full text-[8px] sm:text-[10px] font-bold px-1 sm:px-1.5 ml-0.5",
                       isActive
                         ? "bg-slate-950 text-emerald-400"
                         : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
